@@ -10,8 +10,9 @@
 | 项目 | 值 |
 |------|-----|
 | 名称 | anime-blog（代码与纸飞机） |
-| 框架 | Astro 5.x (v5.18.2) |
+| 框架 | Astro 7.x (^7.1.1) |
 | 样式 | Tailwind CSS v4 (v4.3.3) + PostCSS |
+| 内容格式 | **Markdoc**（`.mdoc`）+ 兼容 `.md` / `.mdx` |
 | CMS | Keystatic（本地 Git 存储，`/keystatic`） |
 | 部署 | Vercel 静态站点 |
 | 域名 | `https://anime-blog.vercel.app` |
@@ -20,9 +21,22 @@
 
 ### 构建配置
 
-- **astro.config.mjs** — 无 Tailwind Vite 插件，使用 PostCSS
+- **astro.config.mjs** — 集成 `@astrojs/react`、`@astrojs/markdoc`、`@keystatic/astro`（仅 dev）
 - **postcss.config.mjs** — `@tailwindcss/postcss` 插件
 - **Tailwind 入口** — `src/styles/global.css` 中 `@import "tailwindcss"`
+- **构建命令** — `astro build && npx pagefind --site dist`（构建时生成搜索索引）
+
+### 关键依赖版本
+
+| 包 | 版本 |
+|----|------|
+| `astro` | ^7.1.1 |
+| `@astrojs/markdoc` | ^2.0.3 |
+| `@astrojs/react` | ^6.0.1 |
+| `@keystatic/core` | ^0.5.51 |
+| `tailwindcss` | ^4.0.0 |
+| `@tailwindcss/postcss` | ^4.3.3 |
+| `pagefind` | ^1.5.2 |
 
 ---
 
@@ -31,49 +45,56 @@
 ```
 anime-blog/
 ├── src/
-│   ├── pages/                  # 路由页面
-│   │   ├── index.astro         # 首页
+│   ├── pages/                      # 路由页面
+│   │   ├── index.astro             # 首页
 │   │   ├── blog/
-│   │   │   ├── index.astro     # 博客列表
-│   │   │   └── [...slug].astro # 文章详情
+│   │   │   ├── index.astro         # 博客列表（客户端筛选）
+│   │   │   └── [...slug].astro     # 文章详情（Content Collection）
 │   │   ├── tags/
-│   │   │   ├── index.astro     # 标签聚合
-│   │   │   └── [tag].astro     # 按标签筛选
-│   │   ├── projects.astro      # 项目展示
-│   │   ├── about.astro         # 关于（带头像发光光环）
-│   │   └── 404.astro           # 404
-│   ├── components/             # 组件
-│   │   ├── SplashScreen.astro  # 开屏动画（动态创建 overlay）
-│   │   ├── Header.astro        # 顶部导航
-│   │   ├── Footer.astro        # 页脚
-│   │   ├── Sidebar.astro       # 侧边栏
-│   │   ├── HeroSection.astro   # 首页 Hero（3D 旋转卡片墙）
-│   │   ├── ArticleCard.astro   # 文章卡片（3D 倾斜 + 光泽扫过）
-│   │   ├── SearchModal.astro   # Pagefind 搜索弹窗
-│   │   ├── ScrollReveal.astro  # 滚动入场动画
-│   │   ├── ZoneFilter.astro    # 专区筛选条
-│   │   ├── GiscusComments.astro# 评论区
-│   │   ├── ReadingProgress.astro# 阅读进度条
-│   │   ├── ThemeToggle.astro   # 主题切换（备用组件）
-│   │   ├── MouseTrail.astro    # 鼠标粒子轨迹
-│   │   ├── TextBounce.astro    # 文字弹跳动画
-│   │   └── HeroSection.astro   # Hero（3D 旋转卡片）
+│   │   │   ├── index.astro         # 标签聚合
+│   │   │   └── [tag].astro         # 按标签筛选
+│   │   ├── projects.astro          # 项目展示
+│   │   ├── about.astro             # 关于（带头像发光光环）
+│   │   └── 404.astro               # 404
+│   ├── components/                  # 组件
+│   │   ├── SplashScreen.astro      # 开屏动画（动态创建 overlay）
+│   │   ├── Header.astro            # 顶部导航
+│   │   ├── Footer.astro            # 页脚
+│   │   ├── Sidebar.astro           # 侧边栏
+│   │   ├── HeroSection.astro       # 首页 Hero（3D 旋转卡片墙）
+│   │   ├── ArticleCard.astro       # 文章卡片（3D 倾斜 + 光泽扫过）
+│   │   ├── SearchModal.astro       # Pagefind 搜索弹窗
+│   │   ├── ScrollReveal.astro      # 滚动入场动画
+│   │   ├── ZoneFilter.astro        # 专区筛选条
+│   │   ├── GiscusComments.astro    # 评论区
+│   │   ├── ReadingProgress.astro   # 阅读进度条
+│   │   ├── ThemeToggle.astro       # 主题切换（备用组件）
+│   │   ├── MouseTrail.astro        # 鼠标粒子轨迹
+│   │   └── TextBounce.astro        # 文字弹跳动画
 │   ├── layouts/
-│   │   └── BaseLayout.astro    # 全局布局（关键！）
+│   │   └── BaseLayout.astro        # 全局布局（关键！）
 │   ├── styles/
-│   │   └── global.css          # Tailwind 入口 + 主题 CSS 变量
+│   │   └── global.css              # Tailwind 入口 + 主题 CSS 变量 + 背景图
 │   ├── content/
-│   │   └── posts/              # Markdown 文章（Keystatic 写入）
-│   ├── consts.ts               # 站点常量、导航、专区
-│   ├── content.config.ts       # Astro Content Collections schema
-│   └── lib/
-│       └── utils.ts            # 工具函数（formatDate 等）
+│   │   └── posts/                  # Markdoc/Markdown 文章（Keystatic 写入）
+│   ├── assets/
+│   │   └── images/                 # Astro 构建时优化的图片（ESM import）
+│   │       ├── gallery-1.jpg
+│   │       ├── gallery-2.jpg
+│   │       ├── gallery-3.jpg
+│   │       ├── hero-banner.png     # 背景图（三月七）
+│   │       └── avatar.png          # 头像
+│   ├── lib/
+│   │   ├── utils.ts                # formatDate / ArticleMeta / ZONES（旧）
+│   │   └── imageMap.ts             # 图片 ESM 导入映射 + resolveHeroImage
+│   ├── consts.ts                   # 站点常量、导航、专区（唯一权威源）
+│   └── content.config.ts           # Astro Content Collections schema
 ├── public/
-│   └── images/                 # 图片资源
-├── astro.config.mjs
+│   └── images/                     # Keystatic 上传的图片（public URL）
 ├── keystatic.config.ts
+├── astro.config.mjs
 ├── postcss.config.mjs
-└── DESIGN_CONVENTIONS.md       # 设计约定
+└── DESIGN_CONVENTIONS.md           # 设计约定（部分过时）
 ```
 
 ---
@@ -82,8 +103,8 @@ anime-blog/
 
 | 路由 | 文件 | 说明 |
 |------|------|------|
-| `/` | `pages/index.astro` | 首页：Hero + 专区筛选 + 文章卡片网格（18 篇） |
-| `/blog` | `pages/blog/index.astro` | 博客列表（全部文章） |
+| `/` | `pages/index.astro` | 首页：Hero + 专区筛选条 + 文章卡片网格（18 篇） |
+| `/blog` | `pages/blog/index.astro` | 博客列表（全部文章，**客户端**专区筛选） |
 | `/blog/[slug]` | `pages/blog/[...slug].astro` | 文章详情（Content Collection 动态路由） |
 | `/tags` | `pages/tags/index.astro` | 标签聚合页 |
 | `/tags/[tag]` | `pages/tags/[tag].astro` | 按标签筛选文章 |
@@ -92,6 +113,11 @@ anime-blog/
 | `/404` | `pages/404.astro` | 404 |
 | `/keystatic` | Keystatic CMS | 开发模式可用，生产构建不包含 |
 
+### 路由说明
+
+- **博客列表客户端筛选**：blog/index.astro 使用 `pushState` + 客户端过滤，点击专区 pill 无刷新切换，ZoneFilter 高亮同步
+- **slug 处理**：`ArticleCard` 传递 slug 时使用 `post.id.replace(/\.md$/, '')` — 注意 `.mdoc` 文件不会去后缀，需路由处理
+
 ---
 
 ## 四、数据流
@@ -99,14 +125,14 @@ anime-blog/
 ### 文章内容
 
 ```
-Keystatic (UI 编辑器)
-  → 写入 src/content/posts/*.md
+Keystatic (UI 编辑器，Markdoc 格式)
+  → 写入 src/content/posts/*.mdoc（或以 .md 导入的旧文章）
     → Astro Content Collections (content.config.ts 定义 schema)
       → getCollection('posts') 获取文章列表
         → 页面渲染 (slug 路由、列表页、标签筛选)
 ```
 
-### 文章 schema
+### 文章 schema（content.config.ts）
 
 ```ts
 interface Post {
@@ -115,62 +141,74 @@ interface Post {
   publishDate: Date;
   zone?: string;       // 学习/编程/生活/运动/娱乐/社交
   tags: string[];      // 默认 []
-  heroImage?: string;  // 封面图路径
+  heroImage?: string;  // 封面图路径（可能是 public URL 或 ESM import）
   draft: boolean;      // 默认 false
 }
 ```
 
-### 专区筛选
+### 文章 slug 生成
 
-常量定义在 `consts.ts`：`全部`、`学习`、`编程`、`生活`、`运动`、`娱乐`、`社交`
-URL 参数 `?zone=编程` 进行筛选。
+- 非 Keystatic 文章（.md）：title → 文件路径中的 slug（如 `hello-blog`）
+- Keystatic 文章（.mdoc）：title → 自动转换为 slug（中文→拼音/编码）
+- `getStaticPaths` 使用 `post.id` 作为 params.slug
+
+### 图片解析流程（lib/imageMap.ts）
+
+```
+heroImage 路径
+  → 是 ESM import 图片? → 返回 ImageMetadata（可用 Astro <Image> 优化）
+  → 是 public URL（/images/xxx）? → 直接当字符串 URL 用
+  → undefined → 不显示封面图
+```
+
+### 内容集合加载器
+
+支持 `**/*.{md,mdoc,mdx}` 三种格式，确保旧 `.md` 文章与新 `.mdoc` 文章共存。
 
 ---
 
 ## 五、BaseLayout.astro — 心脏文件
 
-所有页面共用此布局。它负责：
+所有页面共用此布局。Props：`title`（必填）、`description`、`hideSidebar`。
 
 ### 5.1 模板结构
 
 ```
 <head>
-  - meta / title / fonts
+  - meta / title / fonts（Noto Sans SC + JetBrains Mono）
   - __pageLoads / __isHardReload (is:inline)
+  - astro-view-transitions-enabled
+  - theme-color / color-scheme
 </head>
 <body>
-  - vt-loading (加载指示器条)
-  - SplashScreen (开屏动画)
-  - SearchModal (搜索弹窗)
-  - MouseTrail (鼠标粒子)
-  - Header (导航)
-  - main content slot + sidebar
+  - SplashScreen（开屏动画）
+  - SearchModal（搜索弹窗）
+  - MouseTrail（鼠标粒子）
+  - Header（导航）
+  - main content slot + Sidebar（可隐藏 via hideSidebar）
   - Footer
   - busuanzi 统计 script
-  - vt-flip + vt-flip-body (浮动数字)
-  - flip 波浪弹跳 (is:inline)
-  - 主题 script (is:inline)
-  - View Transitions 事件 (module script)
-  - <style> (加载指示器 + 浮动数字 CSS)
+  - View Transitions 事件 + vt-loading 指示器
+  - vt-flip + vt-flip-body（浮动数字波浪弹跳）
+  - 主题恢复 script (is:inline)
+  - <style>（加载指示器 + 浮动数字 CSS）
 </body>
 ```
 
-### 5.2 View Transitions 事件（module script）
+### 5.2 View Transitions 事件
 
 **`astro:before-preparation`**
 - 设 `window.__splashBlocked = true`
 - `sessionStorage.setItem('splash_blocked', '1')`
 - 显示顶部 `vt-loading` 加载条
 
-**`astro:after-swap`**
-- 隐藏 `vt-loading`
+**`astro:after-swap`** — 隐藏 `vt-loading`
 
-**`astro:page-load`**
-- 隐藏 `vt-loading`
+**`astro:page-load`** — 隐藏 `vt-loading`
 
-### 5.3 浮动数字波浪弹跳（is:inline script）
+### 5.3 浮动数字波浪弹跳
 
-位置：`vt-flip-body` 元素后紧跟的 `<script is:inline>`。
+位置：`vt-flip-body` 元素后紧跟 `<script is:inline>`。
 
 逻辑：
 1. 检查 `window.__splashBlocked` — 只有 View Transition 时才为 `true`
@@ -179,11 +217,7 @@ URL 参数 `?zone=编程` 进行筛选。
 4. 加 `active` class 触发 CSS 波浪弹跳动画
 5. 900ms 后 `setTimeout` 自动隐藏，恢复默认 `✦` 文本
 
-**为什么不放在 module 脚本里？** 因为 module 脚本的 `astro:after-swap` 事件触发时机不稳定，改用 `is:inline` 确保每次页面渲染（含 View Transition）都执行。
-
-### 5.4 开屏拦截机制
-
-三层拦截，确保 View Transition 时不触发 SplashScreen：
+### 5.4 开屏拦截机制（三层）
 
 | 层 | 机制 | 设置方 | 检查方 |
 |----|------|--------|--------|
@@ -199,14 +233,22 @@ URL 参数 `?zone=编程` 进行筛选。
 - `.vt-flip.active .vt-flip-body span` — 波浪弹跳动画 `flipWave`
 - `@keyframes flipWave` — 0%→25%→50%→100%，每个字符依次 `translateY(-16px)` + `color: #f0e68c`
 
+### 5.6 布局关键 CSS 变量
+
+| 变量 | 值 | 说明 |
+|------|-----|------|
+| `--blog-header-h` | 56px | 固定导航高度 |
+| `--blog-content-w` | 1200px | 内容区最大宽度 |
+| `--blog-sidebar-w` | 280px | 侧边栏宽度 |
+
 ---
 
 ## 六、SplashScreen.astro — 开屏动画
 
 ### 技术方案
 
-- **不放在静态 HTML 中**：overlay 由 `is:inline` 脚本 **动态创建**，播完后 `remove()` 从 DOM 彻底删除
-- 这样 View Transition 时 DOM 中无 overlay 元素，不可能闪烁
+- **不放在静态 HTML 中**：overlay 由 `is:inline` 脚本**动态创建**，播完后 `remove()` 从 DOM 删除
+- View Transition 时 DOM 中无 overlay 元素，不可能闪烁
 - 仅在首次硬加载时播放
 
 ### 脚本执行流程
@@ -222,13 +264,6 @@ URL 参数 `?zone=编程` 进行筛选。
    - 4200ms → 文字放大淡出
    - 5000ms → overlay 淡出 → `remove()` 删除
 6. CSS：`!important` 在 prefers-reduced-motion 时强制隐藏
-
-### 样式关键点
-
-- `.splash-overlay { display: none; }`（无 `!important`，因为 overlay 不在静态 HTML）
-- `.splash-overlay.playing { display: flex; }`
-- 背景色 `#08090d`（深色）
-- 中心文字 `color: #fff` + 蓝白色 text-shadow 发光
 
 ---
 
@@ -247,9 +282,10 @@ URL 参数 `?zone=编程` 进行筛选。
 
 首页 Hero 区域：
 - 标题 + 副标题（渐变文字 `bg-linear-to-r`）
-- 3D 旋转卡片墙：16 张卡片绕 Y 轴旋转，每张有亚克力玻璃效果（`backdrop-filter: blur(8px)`）
-- 卡片图片 5 张循环使用，CSS `filter` 衍生 8 种变体
+- 3D 旋转卡片墙：16 张卡片绕 Y 轴旋转
+- 卡片图片来源：`imageMap` 导出的 5 张图片（gallery1~3、avatar、heroBanner），CSS `filter` 衍生 8 种变体
 - 内外环交替：奇数卡片 `translateZ(120px)`，偶数 `translateZ(200px)`
+- 亚克力玻璃效果（`backdrop-filter: blur(8px)`）
 
 ### 7.3 ArticleCard.astro
 
@@ -257,6 +293,8 @@ Bilibili 式文章卡片：
 - 16:9 缩略图 + 内容区
 - 3D 鼠标倾斜效果（`mousemove` → `rotateX`/`rotateY`）
 - 悬停：光泽扫过（`shineSweep` 动画）、Mini 3D 螺旋、accent 色 border 发光
+- 封面图使用 `resolveHeroImage()` 函数智能解析
+- Loading 策略：前 6 张 `eager`，其余 `lazy`
 - `astro:page-load` 重新绑定 3D 倾斜
 
 ### 7.4 SearchModal.astro
@@ -269,10 +307,9 @@ Pagefind 搜索弹窗：
 
 ### 7.5 ScrollReveal.astro
 
-滚动入场动画：
-- CSS transition（`opacity` + `transform`）
-- IntersectionObserver 一次性触发
-- 支持 4 个延迟级别（`reveal-delay-1~3`）
+滚动入场动画（Apple 风格）：
+- CSS transition（`opacity` + `transform`）— cubic-bezier(0.0,0.0,0.2,1) + 18px + 1s
+- IntersectionObserver 一次性触发，stagger 延迟通过 `index` prop 控制
 - View Transition 后 `astro:page-load` 重新绑定
 
 ### 7.6 ZoneFilter.astro
@@ -281,6 +318,7 @@ Pagefind 搜索弹窗：
 - 水平 flex-nowrap + mask-image 右侧渐变隐藏
 - 悬停时 mask-image 移除展示全部
 - 点击跳转 `/blog?zone=xxx`
+- blog/index.astro 拦截点击事件实现无刷新客户端筛选
 
 ### 7.7 Sidebar.astro
 
@@ -314,16 +352,56 @@ Canvas 2D 粒子系统：
 
 GitHub Discussions 评论区：
 - 动态创建 `<script>` 加载 `giscus.app/client.js`
-- 配置：repo-id / category-id 需要替换
+- 配置：repo-id / category-id 需要替换为真实值
 - 主题自适应 `preferred_color_scheme`
 
 ---
 
-## 八、Tailwind CSS 特殊说明
+## 八、Markdoc 内容格式
+
+项目使用 **Markdoc**（`@astrojs/markdoc`）作为主要内容格式。
+
+### 架构
+
+```
+Keystatic fields.markdoc()
+  → 写入 .mdoc 文件
+    → Astro Markdoc 渲染
+      → 文章详情页显示
+```
+
+### Keystatic 编辑器中 Markdoc 支持的格式
+
+- 内联代码 `inlineCode`
+- 加粗/斜体/删除线
+- 链接
+- 分割线
+- 表格
+- 图片（上传到 `public/images/`）
+
+### 旧文章兼容
+
+`content.config.ts` 的 loader 配置为 `glob({ pattern: '**/*.{md,mdoc,mdx}' })`，确保迁移前写的 `.md` 文章仍然可读。
+
+### astro.config.mjs 中 Shiki 代码高亮
+
+```js
+markdown: {
+  shikiConfig: {
+    theme: 'github-dark-default',
+    defaultColor: false,
+    wrap: true,
+  },
+}
+```
+
+---
+
+## 九、Tailwind CSS 特殊说明
 
 ### 历史问题
 
-Tailwind CSS v4 + Astro 5 的集成存在兼容性问题：
+Tailwind CSS v4 + Astro 的集成存在兼容性问题：
 
 | 方案 | 结果 |
 |------|------|
@@ -332,11 +410,9 @@ Tailwind CSS v4 + Astro 5 的集成存在兼容性问题：
 
 **当前方案**：PostCSS 方式。`postcss.config.mjs` 配置 `@tailwindcss/postcss`，`astro.config.mjs` 中无任何 Tailwind 插件。
 
-**已验证**：Tailwind 工具类（`flex`、`grid`、`px-4`、`text-sm` 等）在 dev 输出中正常出现。
-
 ---
 
-## 九、主题系统
+## 十、主题系统
 
 ### 亮色/暗色切换
 
@@ -347,14 +423,23 @@ Tailwind CSS v4 + Astro 5 的集成存在兼容性问题：
 
 ### 主题色系
 
-- 主色：藏蓝 `--blog-accent: #3b4a6b`
-- 亮色背景：米白 `--blog-bg: #f5f2ed`
-- 暗色背景：深灰蓝 `--blog-bg: #13161c`
-- 暗色 accent：浅蓝灰 `--blog-accent: #5a7a9e`
+| 令牌 | 亮色 | 暗色 |
+|------|------|------|
+| `--blog-bg` | `#f5f2ed` | `#13161c` |
+| `--blog-surface` | `#faf8f5` | `#1a1d27` |
+| `--blog-accent` | `#3b4a6b`（藏蓝） | `#5a7a9e`（浅蓝灰）|
+| `--blog-glass` | `rgba(255,255,255,0.78)` | `rgba(26,29,39,0.75)` |
+
+### 背景图
+
+- `body` 使用 `--blog-bg-image`（`url('../assets/images/hero-banner.png')`）作为背景
+- 亮色叠加 `rgba(245,242,237,0.85)` 渐变层
+- 暗色叠加 `rgba(19,22,28,0.92)` 渐变层
+- `background-attachment: fixed`
 
 ---
 
-## 十、View Transitions 详解
+## 十一、View Transitions 详解
 
 ### 启用方式
 
@@ -366,9 +451,9 @@ Tailwind CSS v4 + Astro 5 的集成存在兼容性问题：
 |------|------|-----------------|
 | `astro:before-preparation` | 导航开始前，最早的事件 | 设 `__splashBlocked` / `sessionStorage` / 显示 `vt-loading` |
 | `astro:after-swap` | DOM 替换完成后 | 隐藏 `vt-loading` |
-| `astro:page-load` | 新页面脚本/资源加载完成 | 隐藏 `vt-loading` |
+| `astro:page-load` | 新页面脚本/资源加载完成 | 隐藏 `vt-loading` + 重新绑定 ScrollReveal / 3D 倾斜 |
 
-### 浮动数字动画
+### 浮动数字动画流程
 
 点击链接 → `astro:before-preparation`（模块脚本设旗帜）
 → 新页面 HTML 加载 → 新页面 `is:inline` 脚本执行
@@ -381,55 +466,98 @@ Tailwind CSS v4 + Astro 5 的集成存在兼容性问题：
 - **body 的 is:inline 脚本重新执行**（body 被 replace）
 - **module 脚本不重新执行**（只执行一次）
 - 所以 `__pageLoads` 在 head 里只加一次，不能在 View Transition 中递增
-- 这是 `__splashBlocked` 旗帜方案存在的理由：模块脚本监听 `astro:before-preparation` 来设置
 
 ---
 
-## 十一、关于页 — 头像发光光环
+## 十二、lib/imageMap.ts — 图片解析系统
+
+统一管理所有 ESM 导入的图片，用于 HeroSection 的 3D 卡墙和文章封面图。
+
+### 导出函数
+
+| 函数 | 用途 |
+|------|------|
+| `getImageByFilename(name)` | 根据文件名（如 `gallery-1.jpg`）获取 ImageMetadata |
+| `getImageByPath(path)` | 根据完整路径提取文件名并获取 |
+| `resolveHeroImage(path)` | **智能解析**：优先返回 ImageMetadata，否则当 public URL 用 |
+
+### 解析顺序
+
+1. `imageMap` 中有对应 ESM import → 返回 `ImageMetadata`（可用 `<Image>` 优化渲染）
+2. `path.startsWith('/')` → 直接当 public URL 用（Keystatic 上传到 `public/images/` 的图片）
+3. 无 path → 返回 `undefined`（不显示封面图）
+
+---
+
+## 十三、独立说明
+
+### 关于页 — 头像发光光环
 
 - 使用 `conic-gradient` 渐变环 + CSS `mask: radial-gradient()` 切出中心圆孔
-- `::after` 伪元素 + `filter: blur(12px)` 制造辉光（仿 `103.CSS3发光渐变加载环`）
+- `::after` 伪元素 + `filter: blur(12px)` 制造辉光
 - 旋转动画 `ringSpin 2s linear infinite`
 - prefers-reduced-motion 时隐藏
 
----
-
-## 十二、Keystatic CMS
+### Keystatic CMS
 
 - 地址：`/keystatic`（仅 dev 模式）
 - 存储：`kind: 'local'`（Git 同步）
-- 编辑器：内置，支持标题/描述/日期/专区/标签/封面图/草稿
+- 编辑器：Markdoc 编辑器，支持标题/描述/日期/专区/标签/封面图/草稿/富文本
+- 封面图上传到 `public/images/`，Markdoc 正文图片也上传到 `public/images/`
 - 不包含在生产构建中（`astro.config.mjs` 条件引用）
 
----
+### 博客列表客户端筛选
 
-## 十三、依赖项
-
-### dependencies
-- `@astrojs/react` ^6.0.1
-- `@keystatic/astro` ^5.2.0, `@keystatic/core` ^0.5.51
-- `astro` ^5.0.0
-- `react` ^19.2.7, `react-dom` ^19.2.7
-
-### devDependencies
-- `@tailwindcss/postcss` ^4.3.3
-- `@tailwindcss/vite` ^4.0.0（保留未使用）
-- `postcss` ^8.5.20
-- `tailwindcss` ^4.0.0
-- `pagefind` ^1.5.2
+`src/pages/blog/index.astro` 内联 `<script>`：
+- 拦截 ZoneFilter 点击事件（`e.preventDefault()`）
+- `window.history.pushState` 更新 URL 但不触发导航
+- `.post-item[data-zone]` 属性控制显示/隐藏
+- 同步更新 `zone-pill` 高亮样式
+- `popstate` 事件监听浏览器前进/后退
 
 ---
 
-## 十四、已知问题 / TODO
+## 十四、实际文章列表（19 篇）
+
+| 文章 | 专区 | 格式 |
+|------|------|------|
+| 博客搭建完成 | 编程 | .md |
+| Anime 2026 Summer Mid | 娱乐 | .md |
+| 2026 夏季新番推荐 | 娱乐 | .md |
+| CI/CD Pipeline Guide | 编程 | .md |
+| 骑行入门指南 | 运动 | .md |
+| Desk Setup Makeover | 生活 | .md |
+| Discord Bot 项目 | 编程 | .md |
+| Git 进阶技巧 | 编程 | .md |
+| Indie Games 2026 | 娱乐 | .md |
+| Java Virtual Threads | 编程 | .md |
+| 跑步成瘾 | 运动 | .md |
+| Rust Ownership & Borrowing | 编程 | .md |
+| Spring Boot 3 Features | 编程 | .md |
+| Tech Trends 2026 | 编程 | .md |
+| 5K 训练计划 | 运动 | .md |
+| 程序员的健康管理 | 生活 | .md |
+| Notion 知识库 | 学习 | .md |
+| TypeScript Generics | 编程 | .md |
+| test_nb（测试） | 编程 | .mdoc |
+| football（测试） | 编程 | .mdoc |
+
+---
+
+## 十五、已知问题 / TODO
 
 ### 历史遗留
 - [ ] Giscus repo-id / category-id 需要替换为真实值
-- [ ] RSS 尚未实现
+- [ ] RSS 尚未实现（Footer 中链接指向 `/rss.xml` 但未生成）
 - [ ] 相关文章推荐未实现
 - [ ] 图片灯箱未实现
+- [ ] SITE.repo 指向 `yourusername/anime-blog`
 
 ### 技术债务
-- [ ] `DESIGN_CONVENTIONS.md` 中的目录已过时（缺少 MouseTrail 等新组件）
+- [ ] `DESIGN_CONVENTIONS.md` 中目录过时（缺少 MouseTrail、TextBounce、SplashScreen 等组件）
+- [ ] `DESIGN_CONVENTIONS.md` 仍引用 Astro 5.x
+- [ ] `ArticleCard` 的 slug 处理只用 `.replace(/\.md$/, '')`，不处理 `.mdoc` 后缀
+- [ ] `lib/utils.ts` 中 `ZONES` 与 `consts.ts` 中 `ZONES` 重复定义
 - [ ] `GiscusComments.astro` 的 `GISCUS_REPO_ID` 和 `GISCUS_CATEGORY_ID` 是占位值
-- [ ] Footer 中的 RSS 链接指向 `/rss.xml` 但尚未生成
-- [ ] SITE.repo 指向 `yourusername/anime-blog`
+- [ ] `lib/utils.ts` 中 `ArticleMeta` 接口与 `content.config.ts` 的 schema 不统一（缺少 `draft` 字段）
+- [ ] `DESIGN_CONVENTIONS.md` 仍引用 Astro 5.x，目录缺失 SplashScreen / SearchModal / MouseTrail / TextBounce / GiscusComments 等组件
