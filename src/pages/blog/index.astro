@@ -15,30 +15,81 @@ allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueO
     <p class="text-sm" style="color: var(--blog-text-secondary);">技术、动漫、生活 —— 想到什么写什么</p>
   </div>
 
-  <div class="mb-8">
+  <div class="mb-8" id="zone-filter-wrapper">
     <ZoneFilter basePath="/blog" />
   </div>
 
-  {allPosts.length > 0 ? (
-    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {allPosts.map((post, i) => (
-        <ScrollReveal index={i}>
-          <ArticleCard
-            title={post.data.title}
-            description={post.data.description}
-            slug={post.id.replace(/\.md$/, '')}
-            zone={post.data.zone}
-            tags={post.data.tags}
-            publishDate={post.data.publishDate}
-            heroImage={post.data.heroImage}
-            loading={i < 6 ? 'eager' : 'lazy'}
-          />
-        </ScrollReveal>
-      ))}
-    </div>
-  ) : (
-    <div class="text-center py-20">
-      <p class="text-lg" style="color: var(--blog-text-tertiary);">还没有文章，敬请期待</p>
-    </div>
-  )}
+  <div id="post-grid" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    {allPosts.length > 0 ? (
+      allPosts.map((post, i) => (
+        <div class="post-item" data-zone={post.data.zone}>
+          <ScrollReveal index={i}>
+            <ArticleCard
+              title={post.data.title}
+              description={post.data.description}
+              slug={post.id.replace(/\.md$/, '')}
+              zone={post.data.zone}
+              tags={post.data.tags}
+              publishDate={post.data.publishDate}
+              heroImage={post.data.heroImage}
+              loading={i < 6 ? 'eager' : 'lazy'}
+            />
+          </ScrollReveal>
+        </div>
+      ))
+    ) : (
+      <div class="text-center py-20 col-span-full">
+        <p class="text-lg" style="color: var(--blog-text-tertiary);">还没有文章，敬请期待</p>
+      </div>
+    )}
+  </div>
 </BaseLayout>
+
+<script>
+  function getZoneFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('zone') || '全部';
+  }
+
+  function filterPosts(zone) {
+    // 过滤文章
+    document.querySelectorAll('.post-item').forEach(el => {
+      el.style.display = (!zone || zone === '全部' || el.dataset.zone === zone) ? '' : 'none';
+    });
+
+    // 更新 ZoneFilter 高亮
+    document.querySelectorAll('.zone-pill').forEach(pill => {
+      const href = pill.getAttribute('href') || '';
+      const pillZone = href.includes('zone=')
+        ? decodeURIComponent(href.split('zone=')[1].split('&')[0])
+        : '全部';
+      const isActive = zone === pillZone;
+      pill.style.background = isActive ? 'var(--blog-accent)' : 'var(--blog-accent-light)';
+      pill.style.color = isActive ? '#ffffff' : 'var(--blog-text-secondary)';
+    });
+  }
+
+  function initZoneFilter() {
+    filterPosts(getZoneFromURL());
+  }
+
+  // 拦截 ZoneFilter 点击，无刷新切换
+  document.addEventListener('click', (e) => {
+    const pill = e.target.closest('.zone-pill');
+    if (!pill) return;
+    e.preventDefault();
+    const href = pill.getAttribute('href') || '';
+    const zone = href.includes('zone=')
+      ? decodeURIComponent(href.split('zone=')[1].split('&')[0])
+      : '全部';
+    const newURL = zone === '全部' ? '/blog' : `/blog?zone=${encodeURIComponent(zone)}`;
+    window.history.pushState({ zone }, '', newURL);
+    filterPosts(zone);
+  });
+
+  // 浏览器前进/后退
+  window.addEventListener('popstate', () => initZoneFilter());
+
+  initZoneFilter();
+  document.addEventListener('astro:page-load', initZoneFilter);
+</script>
