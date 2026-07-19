@@ -57,6 +57,22 @@ export default config({
           label: '草稿',
           defaultValue: false,
         }),
+        content: fields.markdoc({
+          label: '正文',
+          formatting: {
+            inlineCode: true,
+            bold: true,
+            italic: true,
+            strikethrough: true,
+          },
+          links: true,
+          dividers: true,
+          tables: true,
+          images: {
+            directory: 'public/images',
+            publicPath: '/images/',
+          },
+        }),
       },
     }),
   },

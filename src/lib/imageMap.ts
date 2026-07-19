@@ -24,4 +24,18 @@ export function getImageByPath(path: string): ImageMetadata | undefined {
   return map[filename];
 }
 
+/**
+ * 解析 heroImage：
+ * 1. 如果 imageMap 中有对应的 ESM import，返回 ImageMetadata（可用 <Image> 优化渲染）
+ * 2. 否则返回 public URL 字符串（Keystatic 上传到 public/images/ 的图片）
+ */
+export function resolveHeroImage(path: string | undefined | null): ImageMetadata | string | undefined {
+  if (!path) return undefined;
+  const imported = getImageByPath(path);
+  if (imported) return imported;
+  // Keystatic 后台上传的图片，直接当 public URL 用
+  if (path.startsWith('/')) return path;
+  return undefined;
+}
+
 export { gallery1, gallery2, gallery3, heroBanner, avatar };

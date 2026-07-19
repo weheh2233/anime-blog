@@ -1,6 +1,6 @@
 ---
 import { Image } from 'astro:assets';
-import { getImageByPath } from '../lib/imageMap';
+import { resolveHeroImage } from '../lib/imageMap';
 
 export interface Props {
   title: string;
@@ -17,7 +17,7 @@ const { title, description, slug, zone, tags = [], publishDate, heroImage, loadi
 const formattedDate = publishDate
   ? publishDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
   : '';
-const resolvedImage = heroImage ? getImageByPath(heroImage) : null;
+const resolvedImage = resolveHeroImage(heroImage);
 ---
 
 <article
@@ -34,15 +34,23 @@ const resolvedImage = heroImage ? getImageByPath(heroImage) : null;
     <!-- 缩略图 16:9 -->
     <div class="relative overflow-hidden" style="aspect-ratio: 16/9; background: var(--blog-accent-lighter);">
       {resolvedImage ? (
-        <Image 
-          src={resolvedImage} 
-          alt={title} 
-          width={800} 
-          height={450} 
-          loading={loading}
-          layout="responsive"
-          class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-        />
+        typeof resolvedImage === 'string' ? (
+          <img
+            src={resolvedImage}
+            alt={title}
+            loading={loading}
+            class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+          />
+        ) : (
+          <Image
+            src={resolvedImage}
+            alt={title}
+            width={800}
+            height={450}
+            loading={loading}
+            class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+          />
+        )
       ) : (
         <div class="w-full h-full flex items-center justify-center" style="color: var(--blog-text-tertiary);">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.3">

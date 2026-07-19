@@ -3,19 +3,21 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import ReadingProgress from '../../components/ReadingProgress.astro';
 import GiscusComments from '../../components/GiscusComments.astro';
 import { Image } from 'astro:assets';
-import { getImageByPath } from '../../lib/imageMap';
-import { getCollection } from 'astro:content';
+import { resolveHeroImage } from '../../lib/imageMap';
+import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
   const posts = await getCollection('posts', ({ data }) => !data.draft);
   return posts.map((post) => ({
-    params: { slug: post.id.replace(/\.md$/, '') },
+    params: { slug: post.id },
     props: { post },
   }));
 }
 
 const { post } = Astro.props;
-const { Content } = await post.render();
+const { Content } = await render(post);
+
+const resolvedHeroImage = resolveHeroImage(post.data.heroImage);
 ---
 
 <BaseLayout title={post.data.title} description={post.data.description} hideSidebar>
@@ -61,10 +63,14 @@ const { Content } = await post.render();
       )}
     </header>
 
-    <!-- 文章封面图 -->
-    {post.data.heroImage && (
+    <!-- 文章封面图：优先用 <Image> 优化；后台上传的用普通 <img> -->
+    {resolvedHeroImage && (
       <div class="mb-10 rounded-[var(--blog-radius-xl)] overflow-hidden">
-        <Image src={getImageByPath(post.data.heroImage)} alt={post.data.title} width={1050} height={450} class="w-full aspect-[21/9] object-cover" />
+        {typeof resolvedHeroImage === 'string' ? (
+          <img src={resolvedHeroImage} alt={post.data.title} class="w-full aspect-[21/9] object-cover" />
+        ) : (
+          <Image src={resolvedHeroImage} alt={post.data.title} width={1050} height={450} class="w-full aspect-[21/9] object-cover" />
+        )}
       </div>
     )}
 
