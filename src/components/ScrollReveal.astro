@@ -1,0 +1,93 @@
+---
+interface Props {
+  class?: string;
+  /** 列表中的索引，用于自动计算 stagger 延时（每项叠加 90ms） */
+  index?: number;
+  /** 浮现方向 */
+  direction?: 'up' | 'down' | 'left' | 'right' | 'scale' | 'none';
+  /** 额外的固定延时 (ms)，叠加在 stagger 之上 */
+  delay?: number;
+}
+
+const { class: className = '', index = 0, direction = 'up', delay = 0 } = Astro.props;
+const staggerDelay = Math.min(index * 90, 720); // 最多 720ms，保证列表尾端不无限延后
+const totalDelay = staggerDelay + delay;
+const dirClass = direction !== 'up' ? `reveal-${direction}` : '';
+---
+
+<div
+  class:list={['reveal', dirClass, className]}
+  data-reveal
+  style={`--reveal-delay: ${totalDelay}ms`}
+>
+  <slot />
+</div>
+
+<style>
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 1s cubic-bezier(0.0, 0.0, 0.2, 1),
+      transform 1s cubic-bezier(0.0, 0.0, 0.2, 1);
+    will-change: transform, opacity;
+  }
+
+  .reveal-left {
+    transform: translateX(-18px);
+  }
+
+  .reveal-right {
+    transform: translateX(18px);
+  }
+
+  .reveal-scale {
+    transform: scale(0.96);
+  }
+
+  .reveal-none {
+    transform: none;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0) translateX(0) scale(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal,
+    .reveal-left,
+    .reveal-right,
+    .reveal-scale,
+    .reveal-none {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        const delay = el.style.getPropertyValue('--reveal-delay') || '0ms';
+        // 先设 delay，再加 class，确保 transition-delay 生效
+        el.style.transitionDelay = delay;
+        el.classList.add('visible');
+        observer.unobserve(el);
+      }
+    });
+  }, {
+    threshold: 0.08,
+    rootMargin: '0px 0px -30px 0px',
+  });
+
+  function init() {
+    document.querySelectorAll('[data-reveal]:not(.visible)').forEach((el) => observer.observe(el));
+  }
+
+  init();
+  document.addEventListener('astro:page-load', init);
+</script>

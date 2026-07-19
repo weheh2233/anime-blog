@@ -1,0 +1,43 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ScrollReveal from '../../components/ScrollReveal.astro';
+import { getCollection } from 'astro:content';
+
+const posts = await getCollection('posts', ({ data }) => !data.draft);
+
+// 聚合所有标签 + 计数
+const tagMap = new Map<string, number>();
+posts.forEach((post) => {
+  post.data.tags?.forEach((tag) => {
+    tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
+  });
+});
+
+const allTags = Array.from(tagMap.entries())
+  .map(([name, count]) => ({ name, count }))
+  .sort((a, b) => b.count - a.count);
+---
+
+<BaseLayout title="标签" description="文章标签聚合">
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-3xl font-bold mb-2" style="color: var(--blog-text-primary);">🏷️ 标签</h1>
+    <p class="text-sm mb-8" style="color: var(--blog-text-secondary);">所有标签的聚合页</p>
+
+    <div class="flex gap-3 flex-wrap">
+      {allTags.map((tag, i) => (
+        <ScrollReveal delay={(i % 4 + 1) as 0 | 1 | 2 | 3}>
+          <a
+            href={`/tags/${encodeURIComponent(tag.name)}`}
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--blog-radius-full)] text-sm no-underline transition-all hover:-translate-y-0.5"
+            style="background: var(--blog-accent-light); color: var(--blog-accent);"
+          >
+            <span># {tag.name}</span>
+            <span class="text-xs px-1.5 py-0.5 rounded-full" style="background: var(--blog-accent-lighter);">
+              {tag.count}
+            </span>
+          </a>
+        </ScrollReveal>
+      ))}
+    </div>
+  </div>
+</BaseLayout>

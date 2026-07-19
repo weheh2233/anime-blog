@@ -1,0 +1,51 @@
+---
+import { ZONES } from '../consts';
+
+interface Props {
+  currentZone?: string;
+  basePath?: string;
+}
+
+const { currentZone = '全部', basePath = '/blog' } = Astro.props;
+---
+
+<div class="zone-filter-wrapper relative">
+  <div class="zone-filter-scroll flex gap-2 overflow-x-auto pb-2" style="mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%); -webkit-mask-image: linear-gradient(to right, black calc(100% - 48px), transparent 100%);">
+    {
+      ZONES.map((zone) => {
+        const isActive = currentZone === zone.key;
+        const href = zone.key === '全部' ? basePath : `${basePath}?zone=${encodeURIComponent(zone.key)}`;
+        return (
+          <a
+            href={href}
+            class="zone-pill whitespace-nowrap px-4 py-1.5 text-sm rounded-[var(--blog-radius-full)] no-underline transition-all duration-200 shrink-0"
+            style={{
+              background: isActive ? 'var(--blog-accent)' : 'var(--blog-accent-light)',
+              color: isActive ? '#ffffff' : 'var(--blog-text-secondary)',
+            }}
+            onmouseover={!isActive ? "this.style.background='var(--blog-accent)'; this.style.color='#ffffff'" : undefined}
+            onmouseout={!isActive ? "this.style.background='var(--blog-accent-light)'; this.style.color='var(--blog-text-secondary)'" : undefined}
+          >
+            {zone.label}
+          </a>
+        );
+      })
+    }
+  </div>
+</div>
+
+<style>
+  .zone-filter-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .zone-filter-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 悬停时显示全部 */
+  .zone-filter-wrapper:hover .zone-filter-scroll {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+</style>

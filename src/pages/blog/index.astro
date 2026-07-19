@@ -1,0 +1,44 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ZoneFilter from '../../components/ZoneFilter.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import ScrollReveal from '../../components/ScrollReveal.astro';
+import { getCollection } from 'astro:content';
+
+const allPosts = await getCollection('posts', ({ data }) => !data.draft);
+allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf());
+---
+
+<BaseLayout title="博客" description="博客文章列表">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold mb-2" style="color: var(--blog-text-primary);">📖 博客</h1>
+    <p class="text-sm" style="color: var(--blog-text-secondary);">技术、动漫、生活 —— 想到什么写什么</p>
+  </div>
+
+  <div class="mb-8">
+    <ZoneFilter basePath="/blog" />
+  </div>
+
+  {allPosts.length > 0 ? (
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {allPosts.map((post, i) => (
+        <ScrollReveal index={i}>
+          <ArticleCard
+            title={post.data.title}
+            description={post.data.description}
+            slug={post.id.replace(/\.md$/, '')}
+            zone={post.data.zone}
+            tags={post.data.tags}
+            publishDate={post.data.publishDate}
+            heroImage={post.data.heroImage}
+            loading={i < 6 ? 'eager' : 'lazy'}
+          />
+        </ScrollReveal>
+      ))}
+    </div>
+  ) : (
+    <div class="text-center py-20">
+      <p class="text-lg" style="color: var(--blog-text-tertiary);">还没有文章，敬请期待</p>
+    </div>
+  )}
+</BaseLayout>

@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+/* ========== Theme: 亮色为主，藏蓝系 ========== */
+:root {
+  /* ===== 背景（可替换为自己的图片） ===== */
+  --blog-bg: #f5f2ed;
+  --blog-bg-image: url('../assets/images/hero-banner.png');  /* 背景图：三月七 */
+  --blog-surface: #faf8f5;   /* 米白色卡片面 */
+  --blog-text-primary: #11181c;
+  --blog-text-secondary: #6b7280;
+  --blog-text-tertiary: #9ca3af;
+  --blog-accent: #3b4a6b;
+  --blog-accent-hover: #4a5d82;
+  --blog-accent-light: #e8ecf3;
+  --blog-accent-lighter: #f0f3f7;
+  --blog-border: #e0ddd7;
+  --blog-border-light: #edebe7;
+  --blog-glass: rgba(255, 255, 255, 0.78);
+  --blog-glass-border: rgba(0, 0, 0, 0.06);
+  --blog-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --blog-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --blog-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --blog-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --blog-radius-sm: 6px;
+  --blog-radius-md: 10px;
+  --blog-radius-lg: 12px;
+  --blog-radius-xl: 16px;
+  --blog-radius-full: 9999px;
+  --blog-font-sans: 'Noto Sans SC', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --blog-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --blog-header-h: 56px;
+  --blog-content-w: 1200px;
+  --blog-sidebar-w: 280px;
+}
+
+.dark {
+  --blog-bg: #13161c;
+  --blog-surface: #1a1d27;
+  --blog-text-primary: #e1e4e8;
+  --blog-text-secondary: #8b95a5;
+  --blog-text-tertiary: #636e7e;
+  --blog-accent: #5a7a9e;
+  --blog-accent-hover: #6b8db5;
+  --blog-accent-light: #1e2533;
+  --blog-accent-lighter: #1a202e;
+  --blog-border: #2a2d3a;
+  --blog-border-light: #232634;
+  --blog-glass: rgba(26, 29, 39, 0.75);
+  --blog-glass-border: rgba(255, 255, 255, 0.06);
+  --blog-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --blog-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --blog-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.25);
+  --blog-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ========== Tailwind v4 Theme Tokens ========== */
+@theme {
+  --color-blog-accent: var(--blog-accent);
+  --color-blog-surface: var(--blog-surface);
+  --font-sans: 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ========== Base ========== */
+html {
+  font-family: var(--blog-font-sans);
+  color: var(--blog-text-primary);
+  background-color: var(--blog-bg);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--blog-bg);
+  background-image:
+    linear-gradient(rgba(245, 242, 237, 0.85), rgba(245, 242, 237, 0.92)),
+    var(--blog-bg-image);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-blend-mode: normal;
+}
+
+:root.dark body {
+  background-image:
+    linear-gradient(rgba(19, 22, 28, 0.92), rgba(19, 22, 28, 0.92)),
+    var(--blog-bg-image);
+}
+
+/* 链接默认样式 */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--blog-accent);
+}
+
+/* ========== Card base（通用卡片类） ========== */
+.card {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--blog-shadow-md);
+}
+
+/* ========== Selection ========== */
+::selection {
+  background: var(--blog-accent);
+  color: white;
+}
+
+/* ========== Scrollbar ========== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--blog-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--blog-text-tertiary); }
+
+/* ========== line-clamp ========== */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ========== Reduced Motion ========== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

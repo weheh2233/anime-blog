@@ -1,0 +1,39 @@
+---
+// 独立主题切换组件（备用，Header 已内置）
+// 如需在页面其他位置放置切换按钮，可复用此组件
+---
+
+<button
+  class="theme-toggle-btn w-8 h-8 flex items-center justify-center rounded-[var(--blog-radius-sm)] transition-colors"
+  style="color: var(--blog-text-secondary); background: transparent; border: 1px solid var(--blog-border); cursor: pointer;"
+  aria-label="切换主题"
+>
+  <svg class="theme-sun-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+  </svg>
+  <svg class="theme-moon-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+  </svg>
+</button>
+
+<script>
+  document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+    const sun = btn.querySelector('.theme-sun-icon');
+    const moon = btn.querySelector('.theme-moon-icon');
+
+    function update() {
+      const isDark = document.documentElement.classList.contains('dark');
+      if (sun) sun.style.display = isDark ? 'none' : 'block';
+      if (moon) moon.style.display = isDark ? 'block' : 'none';
+    }
+    update();
+
+    btn.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      localStorage.setItem('blog-theme', isDark ? 'dark' : 'light');
+      update();
+    });
+  });
+</script>

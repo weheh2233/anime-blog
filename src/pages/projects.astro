@@ -1,0 +1,97 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ScrollReveal from '../components/ScrollReveal.astro';
+
+const projects = [
+  {
+    name: '个人博客',
+    description: '基于 Astro + Tailwind CSS 的个人博客，支持暗色模式、Keystatic CMS、Pagefind 搜索、Giscus 评论。',
+    tech: ['Astro', 'Tailwind CSS', 'Keystatic', 'Pagefind'],
+    url: 'https://anime-blog.vercel.app',
+    repo: 'https://github.com/yourusername/anime-blog',
+    icon: '✦',
+  },
+  {
+    name: 'Discord 机器人',
+    description: '用 Node.js 写的 Discord Bot，支持音乐播放、天气查询、消息翻译等功能。',
+    tech: ['Node.js', 'Discord.js', 'TypeScript'],
+    url: '#',
+    repo: 'https://github.com/yourusername/discord-bot',
+    icon: '🤖',
+  },
+  {
+    name: 'Spring Boot 微服务模板',
+    description: '企业级 Spring Boot 3.x 微服务快速启动模板，包含认证、日志、监控等基础设施。',
+    tech: ['Java', 'Spring Boot', 'Docker'],
+    url: '#',
+    repo: 'https://github.com/yourusername/spring-boot-template',
+    icon: '☕',
+  },
+  {
+    name: '待补充项目',
+    description: '更多项目内容接入 GitHub API 后可自动拉取仓库信息展示。',
+    tech: ['更多', '技术', '栈'],
+    url: '#',
+    repo: '#',
+    icon: '📦',
+  },
+];
+---
+
+<BaseLayout title="项目" description="项目展示">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-2" style="color: var(--blog-text-primary);">🚀 项目</h1>
+    <p class="text-sm mb-8" style="color: var(--blog-text-secondary);">我参与或独立完成的项目</p>
+
+    <div class="grid gap-6 md:grid-cols-2">
+      {projects.map((project, i) => (
+        <ScrollReveal index={i}>
+          <div
+            class="project-card p-6 transition-all duration-300"
+            style={{
+              background: 'var(--blog-surface)',
+              border: '1px solid var(--blog-border)',
+              borderRadius: 'var(--blog-radius-xl)',
+              boxShadow: 'var(--blog-shadow)',
+            }}
+          >
+            <div class="flex items-start gap-4 mb-3">
+              <span class="text-2xl shrink-0 w-10 h-10 flex items-center justify-center rounded-lg" style="background: var(--blog-accent-lighter);">
+                {project.icon}
+              </span>
+              <h2 class="text-lg font-bold" style="color: var(--blog-text-primary);">{project.name}</h2>
+            </div>
+            <p class="text-sm mb-4" style="color: var(--blog-text-secondary);">{project.description}</p>
+            <div class="flex gap-2 flex-wrap mb-4">
+              {project.tech.map(t => (
+                <span class="text-xs px-2 py-0.5 rounded-[var(--blog-radius-sm)]" style="background: var(--blog-accent-lighter); color: var(--blog-text-tertiary);">
+                  {t}
+                </span>
+              ))}
+            </div>
+            <div class="flex gap-3">
+              {project.url && project.url !== '#' && (
+                <a href={project.url} class="text-sm no-underline hover:opacity-80" style="color: var(--blog-accent);" target="_blank" rel="noopener noreferrer">在线演示 →</a>
+              )}
+              {project.repo && project.repo !== '#' && (
+                <a href={project.repo} class="text-sm no-underline hover:opacity-80" style="color: var(--blog-text-tertiary);" target="_blank" rel="noopener noreferrer">源代码 →</a>
+              )}
+            </div>
+          </div>
+        </ScrollReveal>
+      ))}
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .project-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--blog-shadow-hover);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .project-card { animation: none !important; }
+    .project-card:hover { transform: none; }
+  }
+</style>

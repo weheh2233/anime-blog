@@ -1,0 +1,58 @@
+---
+// 文字跳动动画 — 逐字/逐字母弹性跳动
+// 用于 Hero 标题、加载状态等需要吸引注意力的文字
+
+interface Props {
+  text: string;
+  as?: 'h1' | 'h2' | 'h3' | 'span' | 'p';
+  class?: string;
+  loop?: boolean;
+}
+
+const { text, as: Tag = 'span', loop = false } = Astro.props;
+const chars = [...text];
+---
+
+<Tag class="text-bounce {Astro.props.class || ''}" data-loop={loop ? 'true' : 'false'}>
+  {chars.map((char, i) => (
+    <span class="text-bounce-char" style={`--char-i: ${i};`}>
+      {char === ' ' ? ' ' : char}
+    </span>
+  ))}
+</Tag>
+
+<style>
+  .text-bounce-char {
+    display: inline-block;
+    animation: charBounce 2s ease-in-out infinite;
+    animation-delay: calc(var(--char-i) * 0.06s);
+  }
+
+  .text-bounce[data-loop="false"] .text-bounce-char {
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+  }
+
+  @keyframes charBounce {
+    0%, 100% {
+      transform: translateY(0);
+      opacity: 0.6;
+    }
+    25% {
+      transform: translateY(-10px);
+      opacity: 1;
+    }
+    50% {
+      transform: translateY(0);
+      opacity: 0.8;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .text-bounce-char {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>

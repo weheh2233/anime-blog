@@ -1,0 +1,130 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ScrollReveal from '../components/ScrollReveal.astro';
+---
+
+<BaseLayout title="关于" description="关于我和这个博客" hideSidebar>
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-3xl font-bold mb-8" style="color: var(--blog-text-primary);">👤 关于</h1>
+
+    <!-- 个人简介 -->
+    <ScrollReveal>
+      <div class="card p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start" style="background: var(--blog-surface); border: 1px solid var(--blog-border); border-radius: var(--blog-radius-xl);">
+        <!-- 头像位（环绕发光旋转光环 — 仿 103.CSS3发光渐变加载环） -->
+        <div class="avatar-ring-wrap shrink-0">
+          <div class="avatar-ring"></div>
+          <div class="avatar-face w-24 h-24 rounded-full flex items-center justify-center text-2xl" style="background: var(--blog-accent-light); color: var(--blog-accent);">
+            ✦
+          </div>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold mb-2" style="color: var(--blog-text-primary);">你好，我是 Kira 👋</h2>
+          <p class="leading-relaxed" style="color: var(--blog-text-secondary);">
+            一个喜欢动漫的 Java 后端开发者。这个博客用来记录技术学习、项目心得，以及分享喜欢的动漫和游戏。
+          </p>
+          <p class="leading-relaxed mt-2" style="color: var(--blog-text-secondary);">
+            工作之余喜欢跑步、看番、打游戏。相信「代码和纸飞机都能飞得很远」。
+          </p>
+        </div>
+      </div>
+    </ScrollReveal>
+
+    <!-- 技能 -->
+    <ScrollReveal delay={1}>
+      <div class="card p-6 mt-6" style="background: var(--blog-surface); border: 1px solid var(--blog-border); border-radius: var(--blog-radius-xl);">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2" style="color: var(--blog-text-primary);">
+          <span>🛠</span> 技能
+        </h2>
+        <div class="flex gap-2 flex-wrap">
+          {['Java', 'Spring Boot', 'MyBatis', 'MySQL', 'Redis', 'JavaScript', 'TypeScript', 'Astro', 'Tailwind CSS', 'Git', 'Linux'].map((skill) => (
+            <span class="text-sm px-3 py-1.5 rounded-[var(--blog-radius-full)]" style="background: var(--blog-accent-light); color: var(--blog-accent);">
+              {skill}
+            </span>
+          ))}
+        </div>
+      </div>
+    </ScrollReveal>
+
+    <!-- 喜欢的作品 -->
+    <ScrollReveal delay={2}>
+      <div class="card p-6 mt-6" style="background: var(--blog-surface); border: 1px solid var(--blog-border); border-radius: var(--blog-radius-xl);">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2" style="color: var(--blog-text-primary);">
+          <span>🎌</span> 喜欢的作品
+        </h2>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {['作品一', '作品二', '作品三'].map((name) => (
+            <div
+              class="aspect-[3/4] rounded-[var(--blog-radius-lg)] flex flex-col items-center justify-center gap-1 border-2 border-dashed text-sm text-center p-4"
+              style="border-color: var(--blog-border); color: var(--blog-text-tertiary);"
+            >
+              <span class="text-2xl">🎨</span>
+              {name}
+              <span class="text-xs">（放你的图）</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </ScrollReveal>
+
+    <!-- 关于本站 -->
+    <ScrollReveal delay={3}>
+      <div class="card p-6 mt-6" style="background: var(--blog-surface); border: 1px solid var(--blog-border); border-radius: var(--blog-radius-xl);">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2" style="color: var(--blog-text-primary);">
+          <span>📡</span> 关于本站
+        </h2>
+        <div class="space-y-2 text-sm" style="color: var(--blog-text-secondary);">
+          <p>⚡ 框架：Astro 5.x + Tailwind CSS v4</p>
+          <p>📝 CMS：Keystatic（Git 存储）</p>
+          <p>💬 评论：Giscus（Phase 2）</p>
+          <p>🔍 搜索：Pagefind（Phase 2）</p>
+          <p>📊 统计：不蒜子（Phase 2）</p>
+          <p>🚀 部署：Vercel</p>
+        </div>
+      </div>
+    </ScrollReveal>
+  </div>
+</BaseLayout>
+
+<style>
+  /* 头像环绕发光旋转光环（仿 103.CSS3发光渐变加载环动画效果） */
+  .avatar-ring-wrap {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .avatar-ring {
+    position: absolute;
+    inset: 2px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--blog-accent), #e5f403, #7ec8e3, var(--blog-accent));
+    animation: ringSpin 2s linear infinite;
+    -webkit-mask: radial-gradient(circle, transparent 44px, black 45px);
+    mask: radial-gradient(circle, transparent 44px, black 45px);
+  }
+  .avatar-ring::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--blog-accent), #e5f403, #7ec8e3, var(--blog-accent));
+    filter: blur(12px);
+    z-index: -1;
+    -webkit-mask: radial-gradient(circle, transparent 44px, black 45px);
+    mask: radial-gradient(circle, transparent 44px, black 45px);
+  }
+  .avatar-face {
+    position: relative;
+    z-index: 1;
+  }
+  @keyframes ringSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .avatar-ring { display: none; }
+  }
+</style>

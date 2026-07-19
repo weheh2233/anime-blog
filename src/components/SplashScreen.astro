@@ -1,0 +1,293 @@
+---
+// 开屏动画：中心放射破碎棱镜
+// 18 片不规则碎片，各自独立图片，玻璃高光
+// overlay 由 JS 动态创建，仅在首次硬加载时播放
+// View Transition 时 DOM 中无 overlay 元素，彻底消除闪烁
+import { gallery1, gallery2, gallery3, avatar, heroBanner } from '../lib/imageMap';
+
+const splashImages = [
+  gallery1.src,
+  gallery2.src,
+  gallery3.src,
+  avatar.src,
+  heroBanner.src,
+];
+---
+
+<script is:inline data-images={JSON.stringify(splashImages)}>
+(function() {
+  // ===== 多层拦截器，确保 View Transition 时绝不播放 =====
+  // 旗帜由模块脚本的 astro:before-preparation 事件设置
+  if (window.__splashBlocked) return;
+  if (window.__splashShown) return;
+  if (sessionStorage.getItem('splash_blocked')) return;
+  window.__splashShown = true;
+  sessionStorage.setItem('splash_blocked', '1');
+
+  // ========================================================
+  //  动态创建 overlay DOM
+  // ========================================================
+  var overlay = document.createElement('div');
+  overlay.className = 'splash-overlay';
+  overlay.id = 'splash-overlay';
+
+  var stage = document.createElement('div');
+  stage.className = 'shards-stage';
+  stage.id = 'shards-stage';
+
+  var centerText = document.createElement('div');
+  centerText.className = 'center-text';
+  centerText.id = 'center-text';
+  centerText.textContent = '千秋羽霄';
+
+  var label = document.createElement('div');
+  label.className = 'splash-label';
+  label.id = 'splash-label';
+  label.textContent = '✦ 加载中';
+
+  overlay.appendChild(stage);
+  overlay.appendChild(centerText);
+  overlay.appendChild(label);
+  document.body.appendChild(overlay);
+
+  overlay.classList.add('playing');
+
+  // ========================================================
+  //  碎片生成与动画
+  // ========================================================
+  var W = window.innerWidth;
+  var H = window.innerHeight;
+  var CX = W / 2, CY = H / 2;
+  var MAX_R = Math.max(W, H) * 0.72;
+
+  var IMGS = JSON.parse(document.currentScript.getAttribute('data-images'));
+
+  function grng(seed) {
+    var s = seed * 16807 + 12345;
+    return function() { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+  }
+
+  var SECTORS = 8;
+  var shardData = [];
+
+  for (var sec = 0; sec < SECTORS; sec++) {
+    var r = grng(sec * 7919 + 97);
+    var span = (Math.PI * 2) / SECTORS;
+    var aL = sec * span + (r() - 0.5) * span * 0.55;
+    var aR = (sec + 1) * span + (r() - 0.5) * span * 0.55;
+
+    var depths = [0];
+    var nCuts = 1 + Math.floor(r() * 2);
+    for (var d = 0; d < nCuts; d++) {
+      depths.push(0.12 + r() * 0.52);
+    }
+    depths.push(1.0);
+    depths.sort(function(a,b) { return a - b; });
+
+    for (var ri = 0; ri < depths.length - 1; ri++) {
+      var rr0 = depths[ri];
+      var rr1 = depths[ri + 1];
+
+      var pts = [];
+
+      function toPt(a, radFrac, ja, jr) {
+        var ang = a + (r() - 0.5) * ja;
+        var dist = radFrac * MAX_R + (r() - 0.5) * jr * MAX_R * 0.3;
+        return { x: CX + dist * Math.cos(ang), y: CY + dist * Math.sin(ang) };
+      }
+
+      pts.push(toPt(aL, rr0, 0.04, 0.03));
+      pts.push(toPt(aL, rr1, 0.04, 0.03));
+      pts.push(toPt(aR, rr1, 0.04, 0.03));
+      pts.push(toPt(aR, rr0, 0.04, 0.03));
+
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      pts.forEach(function(p) {
+        if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+      });
+      var bx = minX, by = minY, bw = maxX - minX, bh = maxY - minY;
+
+      var clipPx = pts.map(function(p) {
+        return (p.x - bx).toFixed(1) + 'px ' + (p.y - by).toFixed(1) + 'px';
+      }).join(', ');
+
+      var cX = (minX + maxX) / 2, cY = (minY + maxY) / 2;
+      shardData.push({
+        clip: clipPx,
+        left: bx, top: by, w: bw, h: bh,
+        cx: cX, cy: cY,
+        dir: Math.atan2(cY - CY, cX - CX),
+        dist: Math.sqrt((cX - CX) ** 2 + (cY - CY) ** 2),
+      });
+    }
+  }
+
+  var TOTAL = shardData.length;
+
+  for (var i = 0; i < TOTAL; i++) {
+    var d = shardData[i];
+
+    var shard = document.createElement('div');
+    shard.className = 'shard';
+    shard.style.left   = d.left + 'px';
+    shard.style.top    = d.top + 'px';
+    shard.style.width  = d.w + 'px';
+    shard.style.height = d.h + 'px';
+    shard.style.clipPath = 'polygon(' + d.clip + ')';
+    shard.style.transform = 'translate(' + (CX - d.cx) + 'px, ' + (CY - d.cy) + 'px) scale(0.2)';
+    shard.dataset.dx0 = (CX - d.cx);
+    shard.dataset.dy0 = (CY - d.cy);
+    shard.dataset.dir = d.dir;
+    shard.dataset.dist = d.dist;
+
+    var inner = document.createElement('div');
+    inner.className = 'shard-inner';
+
+    var img = document.createElement('div');
+    img.className = 'shard-img';
+    img.style.backgroundImage = 'url(' + IMGS[i % IMGS.length] + ')';
+
+    var glaze = document.createElement('div');
+    glaze.className = 'shard-glaze';
+
+    inner.appendChild(img);
+    inner.appendChild(glaze);
+    shard.appendChild(inner);
+    stage.appendChild(shard);
+  }
+
+  var shards = stage.querySelectorAll('.shard');
+  var DURATION = 5000;
+
+  shards.forEach(function(shard, i) {
+    setTimeout(function() {
+      shard.style.transition = 'all 0.85s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      shard.style.opacity = '1';
+      shard.style.transform = 'translate(0, 0) scale(1)';
+    }, 280 + i * 38);
+  });
+
+  var textDelay = 1800;
+  setTimeout(function() {
+    centerText.style.transition = 'all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+    centerText.style.opacity = '1';
+    centerText.style.transform = 'scale(1)';
+  }, textDelay);
+  setTimeout(function() {
+    label.style.opacity = '1';
+    label.style.transform = 'translateY(0)';
+  }, textDelay);
+
+  var shardScatterT = 2800;
+  setTimeout(function() {
+    shards.forEach(function(shard, i) {
+      var a = parseFloat(shard.dataset.dir);
+      var d = 180 + Math.random() * 320;
+      var dx = Math.cos(a) * d;
+      var dy = Math.sin(a) * d;
+      var ro = (Math.random() - 0.5) * 50;
+      setTimeout(function() {
+        shard.style.transition = 'all 1.15s cubic-bezier(0.76, 0, 0.24, 1)';
+        shard.style.opacity = '0';
+        shard.style.transform = 'translate(' + dx.toFixed(0) + 'px, ' + dy.toFixed(0) + 'px) rotate(' + ro.toFixed(1) + 'deg) scale(0.4)';
+      }, i * 15);
+    });
+  }, shardScatterT);
+
+  var textFadeT = 4200;
+  setTimeout(function() {
+    centerText.style.transition = 'all 0.6s ease';
+    centerText.style.transform = 'scale(1.3)';
+    centerText.style.opacity = '0';
+  }, textFadeT);
+  setTimeout(function() {
+    label.style.opacity = '0';
+    label.style.transform = 'translateY(-10px)';
+  }, textFadeT);
+
+  // 动画完成后从 DOM 移除 overlay
+  setTimeout(function() {
+    overlay.classList.remove('playing');
+    overlay.classList.add('fade-out');
+    setTimeout(function() {
+      overlay.remove();
+    }, 500);
+  }, DURATION);
+})();
+</script>
+
+<style is:global>
+  .splash-overlay {
+    position: fixed; inset: 0; z-index: 99999;
+    display: none; align-items: center; justify-content: center;
+    overflow: hidden;
+    background: #08090d;
+    transition: opacity 0.5s ease;
+  }
+  .splash-overlay.playing { display: flex; }
+  .splash-overlay.fade-out { opacity: 0; pointer-events: none; }
+
+  .shards-stage {
+    position: absolute; inset: 0;
+    opacity: 1;
+    transition: opacity 0.6s ease;
+  }
+  .shards-stage.scattering { opacity: 0; }
+
+  .shard {
+    position: absolute;
+    will-change: transform, opacity;
+    transform-origin: 50% 50%;
+    opacity: 0;
+  }
+  .shard-inner {
+    width: 100%; height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .shard-img {
+    width: 100%; height: 100%;
+    background-size: cover;
+    background-position: center;
+    filter: brightness(1.06) saturate(1.12);
+  }
+  .shard-glaze {
+    position: absolute; inset: 0;
+    background: linear-gradient(
+      140deg,
+      rgba(255,255,255,0.18) 0%,
+      rgba(200,220,255,0.06) 30%,
+      transparent 50%,
+      rgba(100,160,240,0.07) 70%,
+      rgba(140,190,255,0.12) 100%
+    );
+  }
+
+  .center-text {
+    position: absolute; z-index: 5;
+    font-size: 1.1rem; font-weight: 700;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+    color: #fff;
+    text-shadow:
+      0 0 20px rgba(160,210,255,0.8),
+      0 0 50px rgba(100,160,255,0.4),
+      0 2px 4px rgba(0,0,0,0.5);
+    opacity: 0; pointer-events: none;
+    transform: scale(0.6);
+    transition: all 1s ease;
+  }
+
+  .splash-label {
+    position: absolute; bottom: 48px; z-index: 6;
+    font-size: 13px; font-weight: 400; letter-spacing: 4px;
+    color: rgba(160,190,220,0.5);
+    opacity: 0; transform: translateY(12px);
+    transition: all 1s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .splash-overlay { display: none !important; }
+  }
+</style>

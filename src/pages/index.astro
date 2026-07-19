@@ -1,0 +1,64 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import HeroSection from '../components/HeroSection.astro';
+import ZoneFilter from '../components/ZoneFilter.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import ScrollReveal from '../components/ScrollReveal.astro';
+import { SITE } from '../consts';
+import { getCollection } from 'astro:content';
+
+const allPosts = await getCollection('posts', ({ data }) => !data.draft);
+allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf());
+const posts = allPosts.slice(0, 18);
+---
+
+<BaseLayout title="首页" description={SITE.description}>
+  <!-- Hero 区域 -->
+  <HeroSection title={SITE.title} subtitle="记录技术 · 分享生活">
+    {SITE.description}，在这里记录技术、分享生活、聊聊喜欢的作品。
+  </HeroSection>
+
+  <!-- 专区筛选条 -->
+  <div class="max-w-7xl mx-auto px-4 md:px-6 py-4">
+    <ZoneFilter basePath="/blog" />
+  </div>
+
+  <!-- 最新文章 -->
+  <section class="max-w-7xl mx-auto px-4 md:px-6 pb-16">
+    <div class="flex items-center justify-between mb-8">
+      <h2 class="text-2xl font-bold" style="color: var(--blog-text-primary);">📝 最新文章</h2>
+      <a href="/blog" class="text-sm no-underline hover:underline" style="color: var(--blog-accent);">查看全部 →</a>
+    </div>
+
+    {posts.length > 0 ? (
+      <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {posts.map((post, i) => (
+          <ScrollReveal index={i}>
+            <ArticleCard
+              title={post.data.title}
+              description={post.data.description}
+              slug={post.id.replace(/\.md$/, '')}
+              zone={post.data.zone}
+              tags={post.data.tags}
+              publishDate={post.data.publishDate}
+              heroImage={post.data.heroImage}
+              loading={i < 6 ? 'eager' : 'lazy'}
+            />
+          </ScrollReveal>
+        ))}
+      </div>
+    ) : (
+      <div class="text-center py-20">
+        <p class="text-lg" style="color: var(--blog-text-tertiary);">还没有文章，敬请期待</p>
+      </div>
+    )}
+  </section>
+
+  <!-- 动漫装饰位提示 -->
+  <section class="max-w-7xl mx-auto px-4 md:px-6 pb-16">
+    <div class="rounded-[var(--blog-radius-xl)] p-12 text-center border-2 border-dashed" style="border-color: var(--blog-border); background: var(--blog-surface);">
+      <p class="text-lg mb-2" style="color: var(--blog-text-tertiary);">🎌 ここにキャラクターを配置</p>
+      <p class="text-sm" style="color: var(--blog-text-tertiary);">此处预留了角色图展示位，你可以放上喜欢的二次元图片</p>
+    </div>
+  </section>
+</BaseLayout>

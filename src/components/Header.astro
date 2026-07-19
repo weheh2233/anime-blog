@@ -1,0 +1,171 @@
+---
+import { NAV_ITEMS, SITE } from '../consts';
+
+const currentPath = Astro.url.pathname;
+---
+
+<header class="fixed top-0 left-0 right-0 z-50 h-[var(--blog-header-h)]" style="background: var(--blog-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--blog-border-light);">
+  <nav class="max-w-7xl mx-auto px-4 md:px-6 h-full flex items-center justify-between">
+    <!-- Logo -->
+    <a href="/" class="flex items-center gap-2 font-bold text-lg no-underline hover:opacity-80 transition-opacity" style="color: var(--blog-text-primary);">
+      <span style="color: var(--blog-accent);">✦</span>
+      {SITE.title}
+    </a>
+
+    <!-- 导航链接（桌面） -->
+    <div class="hidden md:flex items-center gap-1">
+      {
+        NAV_ITEMS.map((item) => {
+          const isActive = item.href === '/'
+            ? currentPath === '/'
+            : currentPath.startsWith(item.href);
+          return (
+            <a
+              href={item.href}
+              class="px-3 py-2 text-sm rounded-[var(--blog-radius-sm)] transition-colors no-underline"
+              style={{
+                color: isActive ? 'var(--blog-accent)' : 'var(--blog-text-secondary)',
+                background: isActive ? 'var(--blog-accent-light)' : 'transparent',
+              }}
+              onmouseover="this.style.color='var(--blog-accent)'; this.style.background='var(--blog-accent-light)'"
+              onmouseout="this.style.color=this.dataset.origColor; this.style.background=this.dataset.origBg"
+              data-orig-color={isActive ? 'var(--blog-accent)' : 'var(--blog-text-secondary)'}
+              data-orig-bg={isActive ? 'var(--blog-accent-light)' : 'transparent'}
+            >
+              {item.label}
+            </a>
+          );
+        })
+      }
+    </div>
+
+    <!-- 右侧：搜索 + 主题切换 -->
+    <div class="flex items-center gap-2">
+      <!-- 搜索 -->
+      <button
+        id="search-btn"
+        class="w-8 h-8 flex items-center justify-center rounded-[var(--blog-radius-sm)] transition-colors"
+        style="color: var(--blog-text-secondary);"
+        onmouseover="this.style.background='var(--blog-accent-light)'"
+        onmouseout="this.style.background='transparent'"
+        aria-label="搜索"
+        title="搜索 (Ctrl+K)"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.35-4.35"/>
+        </svg>
+      </button>
+
+      <!-- 主题切换 -->
+      <button
+        id="theme-toggle"
+        class="w-8 h-8 flex items-center justify-center rounded-[var(--blog-radius-sm)] transition-colors"
+        style="color: var(--blog-text-secondary);"
+        onmouseover="this.style.background='var(--blog-accent-light)'"
+        onmouseout="this.style.background='transparent'"
+        aria-label="切换主题"
+      >
+        <!-- 太阳（暗色时显示） -->
+        <svg id="theme-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        </svg>
+        <!-- 月亮（亮色时显示） -->
+        <svg id="theme-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+        </svg>
+      </button>
+
+      <!-- 移动端汉堡菜单 -->
+      <button
+        id="menu-btn"
+        class="md:hidden w-8 h-8 flex items-center justify-center rounded-[var(--blog-radius-sm)] transition-colors"
+        style="color: var(--blog-text-secondary);"
+        aria-label="菜单"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="4" y1="6" x2="20" y2="6"/>
+          <line x1="4" y1="12" x2="20" y2="12"/>
+          <line x1="4" y1="18" x2="20" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- 移动端导航抽屉 -->
+  <div id="mobile-menu" class="md:hidden" style="display: none; background: var(--blog-surface); border-top: 1px solid var(--blog-border);">
+    <div class="px-4 py-3 flex flex-col gap-1">
+      {
+        NAV_ITEMS.map((item) => {
+          const isActive = item.href === '/'
+            ? currentPath === '/'
+            : currentPath.startsWith(item.href);
+          return (
+            <a
+              href={item.href}
+              class="px-3 py-2 rounded-[var(--blog-radius-sm)] text-sm no-underline"
+              style={{
+                color: isActive ? 'var(--blog-accent)' : 'var(--blog-text-secondary)',
+                background: isActive ? 'var(--blog-accent-light)' : 'transparent',
+              }}
+            >
+              {item.label}
+            </a>
+          );
+        })
+      }
+    </div>
+  </div>
+</header>
+
+<script>
+  // 主题切换
+  const toggle = document.getElementById('theme-toggle');
+  const sun = document.getElementById('theme-sun');
+  const moon = document.getElementById('theme-moon');
+
+  function updateThemeIcons() {
+    const isDark = document.documentElement.classList.contains('dark');
+    if (sun) sun.style.display = isDark ? 'block' : 'none';
+    if (moon) moon.style.display = isDark ? 'none' : 'block';
+  }
+
+  updateThemeIcons();
+
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      localStorage.setItem('blog-theme', isDark ? 'dark' : 'light');
+      updateThemeIcons();
+    });
+  }
+
+  // 移动端菜单
+  const menuBtn = document.getElementById('menu-btn');
+  const mobileMenu = document.getElementById('mobile-menu');
+
+  if (menuBtn && mobileMenu) {
+    menuBtn.addEventListener('click', () => {
+      const isOpen = mobileMenu.style.display !== 'none';
+      mobileMenu.style.display = isOpen ? 'none' : 'block';
+    });
+  }
+
+  // 搜索按钮
+  const searchBtn = document.getElementById('search-btn');
+  if (searchBtn) {
+    searchBtn.addEventListener('click', () => {
+      if (window.__toggleSearch) window.__toggleSearch();
+    });
+
+    // Ctrl+K 快捷键
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        if (window.__toggleSearch) window.__toggleSearch();
+      }
+    });
+  }
+</script>

@@ -1,0 +1,156 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ReadingProgress from '../../components/ReadingProgress.astro';
+import GiscusComments from '../../components/GiscusComments.astro';
+import { Image } from 'astro:assets';
+import { getImageByPath } from '../../lib/imageMap';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts', ({ data }) => !data.draft);
+  return posts.map((post) => ({
+    params: { slug: post.id.replace(/\.md$/, '') },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+---
+
+<BaseLayout title={post.data.title} description={post.data.description} hideSidebar>
+  <ReadingProgress />
+  <article class="max-w-3xl mx-auto" itemscope itemtype="https://schema.org/Article">
+    <!-- 文章头 -->
+    <header class="mb-10">
+      <h1 class="text-3xl md:text-4xl font-bold mb-4 leading-tight" style="color: var(--blog-text-primary);" itemprop="headline">
+        {post.data.title}
+      </h1>
+
+      <div class="flex flex-wrap items-center gap-3 text-sm" style="color: var(--blog-text-tertiary);">
+        <time itemprop="datePublished" datetime={post.data.publishDate.toISOString()}>
+          {post.data.publishDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+        </time>
+
+        {post.data.zone && (
+          <>
+            <span>·</span>
+            <span class="px-2 py-0.5 rounded-[var(--blog-radius-sm)] text-xs" style="background: var(--blog-accent-light); color: var(--blog-accent);">
+              {post.data.zone}
+            </span>
+          </>
+        )}
+
+        <span>·</span>
+        <span>预计阅读 5 分钟</span>
+      </div>
+
+      <!-- 标签 -->
+      {post.data.tags && post.data.tags.length > 0 && (
+        <div class="flex gap-2 mt-4">
+          {post.data.tags.map(tag => (
+            <a
+              href={`/tags/${encodeURIComponent(tag)}`}
+              class="text-xs px-2 py-1 rounded-[var(--blog-radius-sm)] no-underline transition-colors"
+              style="background: var(--blog-accent-lighter); color: var(--blog-text-tertiary);"
+            >
+              #{tag}
+            </a>
+          ))}
+        </div>
+      )}
+    </header>
+
+    <!-- 文章封面图 -->
+    {post.data.heroImage && (
+      <div class="mb-10 rounded-[var(--blog-radius-xl)] overflow-hidden">
+        <Image src={getImageByPath(post.data.heroImage)} alt={post.data.title} width={1050} height={450} class="w-full aspect-[21/9] object-cover" />
+      </div>
+    )}
+
+    <!-- Markdown 内容 -->
+    <div class="prose-custom max-w-none" itemprop="articleBody">
+      <Content />
+    </div>
+
+    <!-- 文章末尾分隔 -->
+    <hr class="my-12" style="border-color: var(--blog-border);" />
+
+    <!-- 评论区 -->
+    <div id="comments" class="mt-8">
+      <h2 class="text-lg font-bold mb-4" style="color: var(--blog-text-primary);">💬 评论</h2>
+      <GiscusComments />
+    </div>
+  </article>
+</BaseLayout>
+
+<style is:global>
+  .prose-custom {
+    font-size: 1.0625rem;
+    line-height: 1.8;
+    color: var(--blog-text-primary);
+  }
+  .prose-custom h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--blog-border);
+  }
+  .prose-custom h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .prose-custom p { margin-bottom: 1rem; }
+  .prose-custom a {
+    color: var(--blog-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prose-custom a:hover { opacity: 0.8; }
+  .prose-custom code {
+    font-family: var(--blog-font-mono);
+    font-size: 0.9em;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    background: var(--blog-accent-lighter);
+  }
+  .prose-custom pre {
+    padding: 1rem;
+    border-radius: var(--blog-radius-md);
+    overflow-x: auto;
+    margin: 1.5rem 0;
+    background: var(--blog-surface);
+    border: 1px solid var(--blog-border);
+  }
+  .prose-custom pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.875rem;
+  }
+  .prose-custom blockquote {
+    border-left: 3px solid var(--blog-accent);
+    padding-left: 1rem;
+    margin: 1.5rem 0;
+    color: var(--blog-text-secondary);
+    font-style: italic;
+  }
+  .prose-custom img {
+    max-width: 100%;
+    border-radius: var(--blog-radius-md);
+    margin: 1.5rem 0;
+  }
+  .prose-custom ul, .prose-custom ol {
+    padding-left: 1.5rem;
+    margin: 1rem 0;
+  }
+  .prose-custom li { margin-bottom: 0.25rem; }
+  .prose-custom hr {
+    border: none;
+    border-top: 1px solid var(--blog-border);
+    margin: 2rem 0;
+  }
+</style>

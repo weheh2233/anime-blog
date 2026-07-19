@@ -1,0 +1,54 @@
+---
+// 阅读进度条 — 文章页面顶部显示阅读进度
+---
+
+<div id="reading-progress" class="reading-progress" role="progressbar" aria-label="阅读进度"></div>
+
+<style>
+  .reading-progress {
+    position: fixed;
+    top: var(--blog-header-h, 56px);
+    left: 0;
+    height: 3px;
+    width: 0%;
+    z-index: 49;
+    background: linear-gradient(90deg, var(--blog-accent), var(--blog-accent-hover));
+    transition: width 0.1s linear;
+    will-change: width;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reading-progress {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  (function() {
+    const bar = document.getElementById('reading-progress');
+    if (!bar) return;
+
+    function update() {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (docHeight <= 0) {
+        bar.style.width = '0%';
+        return;
+      }
+      const progress = Math.min(scrollTop / docHeight * 100, 100);
+      bar.style.width = progress + '%';
+
+      // 超过 95% 时渐变为金色
+      if (progress > 95) {
+        bar.style.background = 'linear-gradient(90deg, var(--blog-accent), #e8a87c)';
+      } else {
+        bar.style.background = '';
+      }
+    }
+
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update, { passive: true });
+    update();
+  })();
+</script>

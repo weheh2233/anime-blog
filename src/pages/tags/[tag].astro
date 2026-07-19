@@ -1,0 +1,48 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts', ({ data }) => !data.draft);
+  const tagSet = new Set<string>();
+  posts.forEach((p) => p.data.tags?.forEach((t) => tagSet.add(t)));
+
+  return Array.from(tagSet).map((tag) => {
+    const filtered = posts.filter((p) => p.data.tags?.includes(tag));
+    return { params: { tag }, props: { tag, posts: filtered } };
+  });
+}
+
+const { tag, posts } = Astro.props;
+---
+
+<BaseLayout title={`标签: ${tag}`} description={`筛选标签 #${tag} 的文章`}>
+  <div class="mb-8">
+    <a href="/tags" class="text-sm no-underline hover:underline" style="color: var(--blog-accent);">← 所有标签</a>
+    <h1 class="text-3xl font-bold mt-2" style="color: var(--blog-text-primary);"># {tag}</h1>
+    <p class="text-sm mt-1" style="color: var(--blog-text-secondary);">
+      {posts.length > 0 ? `找到 ${posts.length} 篇文章` : '暂无文章'}
+    </p>
+  </div>
+
+  {posts.length > 0 ? (
+    <div class="grid gap-6 md:grid-cols-2">
+      {posts.map((post) => (
+        <ArticleCard
+          title={post.data.title}
+          description={post.data.description}
+          slug={post.id.replace(/\.md$/, '')}
+          zone={post.data.zone}
+          tags={post.data.tags}
+          publishDate={post.data.publishDate}
+          heroImage={post.data.heroImage}
+        />
+      ))}
+    </div>
+  ) : (
+    <div class="text-center py-20 rounded-[var(--blog-radius-lg)]" style="background: var(--blog-surface); border: 1px solid var(--blog-border);">
+      <p class="text-lg" style="color: var(--blog-text-tertiary);">还没有此标签的文章</p>
+    </div>
+  )}
+</BaseLayout>

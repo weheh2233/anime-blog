@@ -1,0 +1,85 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Sidebar from '../components/Sidebar.astro';
+import SplashScreen from '../components/SplashScreen.astro';
+import SearchModal from '../components/SearchModal.astro';
+import MouseTrail from '../components/MouseTrail.astro';
+import { SITE } from '../consts';
+
+interface Props {
+  title: string;
+  description?: string;
+  hideSidebar?: boolean;
+}
+
+const { title, description, hideSidebar } = Astro.props;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description || SITE.description} />
+    <meta name="theme-color" content="#f5f2ed" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <title>{title} | {SITE.title}</title>
+    <meta name="astro-view-transitions-enabled" content="true" />
+
+    <!-- 页面加载计数（必须在 body 内嵌脚本之前运行） -->
+    <script is:inline>
+      window.__pageLoads = (window.__pageLoads || 0) + 1;
+      window.__isHardReload = window.__pageLoads === 1;
+    </script>
+  </head>
+  <body>
+    <SplashScreen />
+    <SearchModal />
+    <MouseTrail />
+    <Header />
+
+    <!-- 主内容区 -->
+    <div class="flex-1 pt-[var(--blog-header-h)] flex" transition:animate="slide">
+      <div class="mx-auto w-full px-4 md:px-8 flex gap-10 py-8" style="max-width: 1500px;">
+        <main class="flex-1 min-w-0">
+          <slot />
+        </main>
+
+        {!hideSidebar && (
+          <aside class="hidden xl:block shrink-0 self-start sticky overflow-y-auto" style="width: var(--blog-sidebar-w); top: calc(var(--blog-header-h) + 24px); max-height: calc(100vh - var(--blog-header-h) - 48px);">
+            <Sidebar />
+          </aside>
+        )}
+      </div>
+    </div>
+
+    <Footer />
+
+    <!-- 不蒜子统计 -->
+    <script is:inline defer src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+    <!-- 主题 -->
+    <script is:inline>
+      (function() {
+        if (localStorage.getItem('blog-theme') === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+
+    <!-- View Transitions 开屏拦截 -->
+    <script>
+      window.__splashBlocked = false;
+      document.addEventListener('astro:before-preparation', function() {
+        window.__splashBlocked = true;
+        sessionStorage.setItem('splash_blocked', '1');
+      });
+    </script>
+  </body>
+</html>

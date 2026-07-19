@@ -1,0 +1,119 @@
+---
+// 鼠标轨迹粒子效果（Canvas 2D 对象池）
+// 跟随鼠标移动发射粒子，带拖尾淡出
+// 仅在桌面端加载，移动端跳过
+---
+
+<canvas id="mouse-trail-canvas" aria-hidden="true"></canvas>
+
+<style>
+  #mouse-trail-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  @media (max-width: 768px) {
+    #mouse-trail-canvas {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #mouse-trail-canvas {
+      display: none !important;
+    }
+  }
+</style>
+
+<script>
+  (function() {
+    const canvas = document.getElementById('mouse-trail-canvas');
+    if (!canvas) return;
+
+    // 移动端跳过
+    if (window.innerWidth <= 768) return;
+
+    const ctx = canvas.getContext('2d');
+    let w, h;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // ===== 对象池 =====
+    const POOL_SIZE = 200;
+    const pool = Array.from({ length: POOL_SIZE }, () => ({
+      x: 0, y: 0, vx: 0, vy: 0,
+      life: 0, decay: 0, r: 0, active: false,
+      hue: 200,
+    }));
+    let poolIndex = 0;
+    let mouseX = -1000;
+    let mouseY = -1000;
+    let lastSpawn = 0;
+
+    function spawn(x, y) {
+      const now = performance.now();
+      if (now - lastSpawn < 30) return; // 节流
+      lastSpawn = now;
+
+      const p = pool[poolIndex];
+      p.x = x + (Math.random() - 0.5) * 10;
+      p.y = y + (Math.random() - 0.5) * 10;
+      p.vx = (Math.random() - 0.5) * 2.5;
+      p.vy = (Math.random() - 0.5) * 2.5 - 0.5;
+      p.life = 1;
+      p.decay = Math.random() * 0.018 + 0.012;
+      p.r = Math.random() * 2.5 + 1;
+      p.active = true;
+      p.hue = 200 + Math.random() * 30; // 蓝紫色系
+      poolIndex = (poolIndex + 1) % POOL_SIZE;
+    }
+
+    function update() {
+      ctx.clearRect(0, 0, w, h);
+
+      for (let i = 0; i < POOL_SIZE; i++) {
+        const p = pool[i];
+        if (!p.active) continue;
+
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.decay;
+
+        if (p.life <= 0) {
+          p.active = false;
+          continue;
+        }
+
+        const alpha = p.life * 0.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue}, 40%, 60%, ${alpha})`;
+        ctx.fill();
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    // 鼠标移动
+    window.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+      // 每帧 spawn 在上次 spawn 旁完成，但这里限制发射数
+      for (let i = 0; i < 2; i++) {
+        spawn(mouseX, mouseY);
+      }
+    });
+
+    update();
+  })();
+</script>

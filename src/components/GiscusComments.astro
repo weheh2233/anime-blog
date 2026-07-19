@@ -1,0 +1,43 @@
+---
+/**
+ * Giscus 评论区 — GitHub Discussions 驱动
+ *
+ * 使用前需配置：
+ * 1. 你的 GitHub 仓库开启 Discussions 功能
+ * 2. 安装 Giscus App: https://github.com/apps/giscus
+ * 3. 访问 https://giscus.app 获取 repo-id / category-id
+ * 4. 替换下方常量
+ */
+
+const GISCUS_REPO = 'yourusername/anime-blog';
+const GISCUS_REPO_ID = 'R_kgDOLXxxx';     // 替换为你的 repo-id
+const GISCUS_CATEGORY = 'Comments';
+const GISCUS_CATEGORY_ID = 'DIC_kwDOLXxxx'; // 替换为你的 category-id
+---
+
+<div class="giscus mt-10" id="giscus-comments"></div>
+
+<script is:inline>
+  (function() {
+    const container = document.getElementById('giscus-comments');
+    if (!container) return;
+
+    const script = document.createElement('script');
+    script.src = 'https://giscus.app/client.js';
+    script.setAttribute('data-repo', '${GISCUS_REPO}');
+    script.setAttribute('data-repo-id', '${GISCUS_REPO_ID}');
+    script.setAttribute('data-category', '${GISCUS_CATEGORY}');
+    script.setAttribute('data-category-id', '${GISCUS_CATEGORY_ID}');
+    script.setAttribute('data-mapping', 'pathname');
+    script.setAttribute('data-strict', '0');
+    script.setAttribute('data-reactions-enabled', '1');
+    script.setAttribute('data-emit-metadata', '0');
+    script.setAttribute('data-input-position', 'top');
+    script.setAttribute('data-theme', 'preferred_color_scheme');
+    script.setAttribute('data-lang', 'zh-CN');
+    script.setAttribute('data-loading', 'lazy');
+    script.setAttribute('crossorigin', 'anonymous');
+    script.async = true;
+    container.appendChild(script);
+  })();
+</script>
