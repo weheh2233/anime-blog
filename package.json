@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && npx pagefind --site .vercel/output/static --glob \"**/blog/**\" && cp -r .vercel/output/static/pagefind public/pagefind",
+    "build": "astro build && npx pagefind --site .vercel/output/static --glob \"**/blog/**/*.html\" && cp -r .vercel/output/static/pagefind public/pagefind",
     "preview": "astro preview",
     "astro": "astro"
   },
