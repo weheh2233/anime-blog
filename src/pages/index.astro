@@ -8,15 +8,7 @@ import { SITE } from '../consts';
 import { getCollection } from 'astro:content';
 
 const allPosts = await getCollection('posts', ({ data }) => !data.draft);
-allPosts.sort((a, b) => {
-  // 置顶优先
-  if (a.data.pinned !== b.data.pinned) return a.data.pinned ? -1 : 1;
-  // 按日期降序
-  const dateCmp = b.data.publishDate.valueOf() - a.data.publishDate.valueOf();
-  if (dateCmp !== 0) return dateCmp;
-  // 同日期 slug 倒序
-  return b.id.localeCompare(a.id);
-});
+allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf());
 const posts = allPosts.slice(0, 18);
 ---
 
@@ -50,7 +42,6 @@ const posts = allPosts.slice(0, 18);
               tags={post.data.tags}
               publishDate={post.data.publishDate}
               heroImage={post.data.heroImage}
-              pinned={post.data.pinned}
               loading={i < 6 ? 'eager' : 'lazy'}
             />
           </ScrollReveal>

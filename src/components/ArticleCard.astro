@@ -10,11 +10,10 @@ export interface Props {
   tags?: string[];
   publishDate?: Date;
   heroImage?: string;
-  pinned?: boolean;
   loading?: 'lazy' | 'eager';
 }
 
-const { title, description, slug, zone, tags = [], publishDate, heroImage, pinned = false, loading = 'lazy' } = Astro.props;
+const { title, description, slug, zone, tags = [], publishDate, heroImage, loading = 'lazy' } = Astro.props;
 const formattedDate = publishDate
   ? publishDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
   : '';
@@ -33,11 +32,6 @@ const resolvedImage = resolveHeroImage(heroImage);
   <a href={`/blog/${slug}`} class="block no-underline">
     <!-- 缩略图 16:9 -->
     <div class="relative overflow-hidden" style="aspect-ratio: 16/9; background: var(--blog-accent-lighter);">
-      {pinned && (
-        <span class="absolute top-2 right-2 z-10 text-xs px-2 py-0.5 rounded-full font-bold" style="background: var(--blog-accent); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-          📌 置顶
-        </span>
-      )}
       {resolvedImage ? (
         typeof resolvedImage === 'string' ? (
           <img
