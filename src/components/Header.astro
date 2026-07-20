@@ -77,23 +77,21 @@ const currentPath = Astro.url.pathname;
         </svg>
       </button>
 
-      <!-- CMS 后台入口（仅 dev 模式） -->
-      {import.meta.env.DEV && (
-        <a
-          href="/keystatic"
-          class="w-8 h-8 flex items-center justify-center rounded-[var(--blog-radius-sm)] transition-colors no-underline"
-          style="color: var(--blog-text-secondary);"
-          onmouseover="this.style.background='var(--blog-accent-light)'"
-          onmouseout="this.style.background='transparent'"
-          aria-label="写博客"
-          title="写博客"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-            <path d="m15 5 4 4"/>
-          </svg>
-        </a>
-      )}
+      <!-- CMS 后台入口 -->
+      <a
+        href="/keystatic"
+        class="w-8 h-8 flex items-center justify-center rounded-[var(--blog-radius-sm)] transition-colors no-underline"
+        style="color: var(--blog-text-secondary);"
+        onmouseover="this.style.background='var(--blog-accent-light)'"
+        onmouseout="this.style.background='transparent'"
+        aria-label="写博客"
+        title="写博客"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+          <path d="m15 5 4 4"/>
+        </svg>
+      </a>
 
       <!-- 移动端汉堡菜单 -->
       <button
@@ -133,15 +131,13 @@ const currentPath = Astro.url.pathname;
           );
         })
       }
-      {import.meta.env.DEV && (
-        <a
-          href="/keystatic"
-          class="px-3 py-2 rounded-[var(--blog-radius-sm)] text-sm no-underline"
-          style="color: var(--blog-text-secondary);"
-        >
-          ✏️ 写博客
-        </a>
-      )}
+      <a
+        href="/keystatic"
+        class="px-3 py-2 rounded-[var(--blog-radius-sm)] text-sm no-underline"
+        style="color: var(--blog-text-secondary);"
+      >
+        ✏️ 写博客
+      </a>
     </div>
   </div>
 </header>
