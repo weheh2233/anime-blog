@@ -2,7 +2,7 @@
 title: "如何用 Notion 搭建个人知识库"
 description: "建立一套可持续维护的笔记体系，告别信息焦虑。"
 publishDate: 2026-06-28
-heroImage: "gallery-3.jpg"
+heroImage: "/images/gallery-3.webp"
 zone: "生活"
 tags: ["效率", "Notion"]
 draft: false

@@ -4,7 +4,7 @@ description: "换了升降桌、理线、重新布局，工作幸福感提升了
 publishDate: 2026-07-05
 zone: "生活"
 tags: ["桌面", "效率"]
-heroImage: "gallery-1.jpg"
+heroImage: "/images/gallery-1.webp"
 draft: false
 ---
 

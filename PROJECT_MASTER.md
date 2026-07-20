@@ -21,10 +21,11 @@
 
 ### 构建配置
 
-- **astro.config.mjs** — 集成 `@astrojs/react`、`@astrojs/markdoc`、`@keystatic/astro`（仅 dev）
-- **postcss.config.mjs** — `@tailwindcss/postcss` 插件
-- **Tailwind 入口** — `src/styles/global.css` 中 `@import "tailwindcss"`
+- **astro.config.mjs** — 集成 `@astrojs/react`、`@astrojs/markdoc`、`@keystatic/astro`（仅 dev）、`@tailwindcss/vite`
+- **Tailwind 入口** — `src/styles/global.css` 中 `@import "tailwindcss"`，由 `@tailwindcss/vite` 插件处理
 - **构建命令** — `astro build && npx pagefind --site dist`（构建时生成搜索索引）
+
+> ⚠️ 历史：曾用 `@tailwindcss/postcss`（PostCSS 方式），但 Astro 7 + Rolldown 下 PostCSS import 解析不兼容导致构建失败。当前使用 `@tailwindcss/vite` 确保正确处理 `@import "tailwindcss"`。`postcss.config.mjs` 已禁用（保留为 `.disabled`）。
 
 ### 关键依赖版本
 
@@ -397,18 +398,16 @@ markdown: {
 
 ---
 
-## 九、Tailwind CSS 特殊说明
+## 九、Tailwind CSS 说明
 
-### 历史问题
+### 当前方案
 
-Tailwind CSS v4 + Astro 的集成存在兼容性问题：
+使用 `@tailwindcss/vite`（Vite 插件方式），在 `astro.config.mjs` 的 `vite.plugins` 中配置。
+`src/styles/global.css` 中使用 `@import "tailwindcss"` 引入，由插件自动处理。
 
-| 方案 | 结果 |
-|------|------|
-| `@tailwindcss/vite` v4.3.3 | ❌ 不生成工具类（dev + build 均失效） |
-| `@tailwindcss/postcss` v4.3.3 | ✅ 正常工作 |
+### 历史
 
-**当前方案**：PostCSS 方式。`postcss.config.mjs` 配置 `@tailwindcss/postcss`，`astro.config.mjs` 中无任何 Tailwind 插件。
+曾尝试 `@tailwindcss/postcss`（PostCSS 方式），但 Astro 7 + Rolldown 下 PostCSS import 解析会尝试将 `@import "tailwindcss"` 解析为文件路径，导致 ENOENT 构建失败。切换为 `@tailwindcss/vite` 后修复。
 
 ---
 

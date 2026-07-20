@@ -4,7 +4,7 @@ description: "记录 Spring Boot 3.x 的关键新特性，包括虚拟线程、G
 publishDate: 2026-07-18
 zone: "学习"
 tags: ["Spring Boot", "Java"]
-heroImage: "gallery-2.jpg"
+heroImage: "/images/gallery-2.webp"
 draft: false
 ---
 

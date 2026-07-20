@@ -4,7 +4,7 @@ description: "从一个跑 800 米都喘的人，到能跑 10 公里，分享一
 publishDate: 2026-07-10
 zone: "运动"
 tags: ["跑步", "健康"]
-heroImage: "hero-banner.png"
+heroImage: "/images/hero-banner.webp"
 draft: false
 ---
 

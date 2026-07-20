@@ -1,4 +1,4 @@
-import { config, collection, fields } from '@keystatic/core';
+import { config, collection, singleton, fields } from '@keystatic/core';
 
 const ZONES = [
   { label: '学习', value: '学习' },
@@ -73,6 +73,27 @@ export default config({
             publicPath: '/images/',
           },
         }),
+      },
+    }),
+  },
+
+  singletons: {
+    siteSettings: singleton({
+      label: '站点设置',
+      path: 'src/content/site/',
+      schema: {
+        backgroundImages: fields.array(
+          fields.image({
+            label: '背景图',
+            directory: 'public/images/site/',
+            publicPath: '/images/site/',
+          }),
+          {
+            label: '自定义背景图',
+            description: '可上传多张，每次刷新首页随机显示（与默认背景图一起轮换）',
+            itemLabel: (props) => props.value?.filename || '新背景图',
+          }
+        ),
       },
     }),
   },

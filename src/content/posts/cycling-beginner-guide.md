@@ -4,7 +4,7 @@ description: "从零开始的公路车入门指南，不踩坑的装备清单。
 publishDate: 2026-06-20
 zone: "运动"
 tags: ["骑行", "入门"]
-heroImage: "gallery-2.jpg"
+heroImage: "/images/gallery-2.webp"
 draft: false
 ---
 

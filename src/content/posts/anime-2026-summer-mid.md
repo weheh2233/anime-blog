@@ -4,7 +4,7 @@ description: "开播一个月的追番体验，聊聊哪些值得追、哪些可
 publishDate: 2026-07-01
 zone: "娱乐"
 tags: ["动漫", "评测"]
-heroImage: "gallery-3.jpg"
+heroImage: "/images/gallery-3.webp"
 draft: false
 ---
 

@@ -1,0 +1,27 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Binary image files - treat as binary (no line-ending conversion, no diff)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+
+# SVGs are text-based
+*.svg text
+
+# Markdown text files
+*.md text diff=markdown
+*.mdoc text
+
+# Source code
+*.ts text
+*.tsx text
+*.mjs text
+*.json text
+*.css text
+*.astro text
+*.yaml text
+*.yml text

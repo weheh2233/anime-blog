@@ -78,7 +78,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--blog-bg);
   background-image:
-    linear-gradient(rgba(245, 242, 237, 0.85), rgba(245, 242, 237, 0.92)),
+    linear-gradient(rgba(245, 242, 237, 0.3), rgba(245, 242, 237, 0.3)),
     var(--blog-bg-image);
   background-size: cover;
   background-position: center;

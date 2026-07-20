@@ -1,9 +1,9 @@
 import type { ImageMetadata } from 'astro';
-import gallery1 from '../assets/images/gallery-1.jpg';
-import gallery2 from '../assets/images/gallery-2.jpg';
-import gallery3 from '../assets/images/gallery-3.jpg';
-import heroBanner from '../assets/images/hero-banner.png';
-import avatar from '../assets/images/avatar.png';
+import gallery1 from '../assets/images/gallery-1.webp';
+import gallery2 from '../assets/images/gallery-2.webp';
+import gallery3 from '../assets/images/gallery-3.webp';
+import heroBanner from '../assets/images/hero-banner.webp';
+import avatar from '../assets/images/avatar.webp';
 
 const map: Record<string, ImageMetadata> = {
   'gallery-1.jpg': gallery1,
@@ -26,8 +26,9 @@ export function getImageByPath(path: string): ImageMetadata | undefined {
 
 /**
  * 解析 heroImage：
- * 1. 如果 imageMap 中有对应的 ESM import，返回 ImageMetadata（可用 <Image> 优化渲染）
- * 2. 否则返回 public URL 字符串（Keystatic 上传到 public/images/ 的图片）
+ * - imageMap 中的图片 → 返回 ImageMetadata（ArticleCard 用 <Image> 做 responsive 适配）
+ * - Keystatic 上传到 public/images/ 的封面图 → 返回 public URL 字符串
+ * - 不匹配 → undefined
  */
 export function resolveHeroImage(path: string | undefined | null): ImageMetadata | string | undefined {
   if (!path) return undefined;

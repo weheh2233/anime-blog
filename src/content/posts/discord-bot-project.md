@@ -4,7 +4,7 @@ description: "用 Node.js 写了个 Discord Bot，可以播放音乐、查天气
 publishDate: 2026-06-22
 zone: "编程"
 tags: ["Node.js", "项目"]
-heroImage: "gallery-1.jpg"
+heroImage: "/images/gallery-1.webp"
 draft: false
 ---
 

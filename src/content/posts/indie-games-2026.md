@@ -4,7 +4,7 @@ description: "几个画面精美、玩法独特的独立游戏推荐，适合周
 publishDate: 2026-06-12
 zone: "娱乐"
 tags: ["游戏", "推荐"]
-heroImage: "hero-banner.png"
+heroImage: "/images/hero-banner.webp"
 draft: false
 ---
 

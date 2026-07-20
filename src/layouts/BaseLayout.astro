@@ -7,6 +7,28 @@ import SplashScreen from '../components/SplashScreen.astro';
 import SearchModal from '../components/SearchModal.astro';
 import MouseTrail from '../components/MouseTrail.astro';
 import { SITE } from '../consts';
+import fs from 'node:fs';
+
+// 背景图随机池 — 往 src/assets/bg/ 丢图即可自动加入
+const bgPool = Object.values(
+  import.meta.glob<{ default: import('astro').ImageMetadata }>('../assets/bg/*.{webp,jpg,png}', { eager: true })
+).map(m => m.default.src);
+
+// Keystatic 后台自定义背景图（从 index.yaml 读取）
+try {
+  const raw = fs.readFileSync('src/content/site/index.yaml', 'utf-8');
+  const lines = raw.split('\n');
+  let inArray = false;
+  for (const line of lines) {
+    if (line.trim() === 'backgroundImages:') { inArray = true; continue; }
+    if (inArray && line.trimStart().startsWith('- ')) {
+      const url = line.trimStart().slice(2).trim();
+      if (url) bgPool.push(url);
+    } else if (inArray && !line.trimStart().startsWith('- ')) {
+      break; // array ended
+    }
+  }
+} catch (_) { /* 还没有站点设置文件 */ }
 
 interface Props {
   title: string;
@@ -28,7 +50,7 @@ const { title, description, hideSidebar } = Astro.props;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
     <title>{title} | {SITE.title}</title>
     <meta name="astro-view-transitions-enabled" content="true" />
 
@@ -36,6 +58,20 @@ const { title, description, hideSidebar } = Astro.props;
     <script is:inline>
       window.__pageLoads = (window.__pageLoads || 0) + 1;
       window.__isHardReload = window.__pageLoads === 1;
+    </script>
+
+    <!-- 随机背景图：每次刷新换一张 -->
+    <script type="application/json" id="bg-pool" set:html={JSON.stringify(bgPool)}></script>
+    <script is:inline>
+      (function() {
+        var pool = JSON.parse(document.getElementById('bg-pool').textContent);
+        if (pool.length > 0) {
+          document.documentElement.style.setProperty(
+            '--blog-bg-image',
+            'url(' + pool[Math.floor(Math.random() * pool.length)] + ')'
+          );
+        }
+      })();
     </script>
   </head>
   <body>

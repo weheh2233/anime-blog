@@ -4,7 +4,7 @@ description: "AI 代理、边缘计算、量子计算的商业化进展——今
 publishDate: 2026-06-05
 zone: "社交"
 tags: ["科技", "趋势"]
-heroImage: "gallery-2.jpg"
+heroImage: "/images/gallery-2.webp"
 draft: false
 ---
 

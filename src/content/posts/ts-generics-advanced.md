@@ -2,7 +2,7 @@
 title: "TypeScript 泛型高级用法笔记"
 description: "条件类型、模板字面量类型、infer 关键字……泛型远比你想象的强大。"
 publishDate: 2026-07-08
-heroImage: "hero-banner.png"
+heroImage: "/images/hero-banner.webp"
 zone: "学习"
 tags: ["TypeScript", "前端"]
 draft: false

@@ -63,7 +63,7 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage);
       )}
     </header>
 
-    <!-- 文章封面图：优先用 <Image> 优化；后台上传的用普通 <img> -->
+    <!-- 文章封面图：imageMap 图用 <Image> 做 responsive 适配，Keystatic 图用 <img> -->
     {resolvedHeroImage && (
       <div class="mb-10 rounded-[var(--blog-radius-xl)] overflow-hidden">
         {typeof resolvedHeroImage === 'string' ? (
@@ -106,7 +106,7 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage);
   }
   .prose-custom h3 {
     font-size: 1.25rem;
-    font-weight: 600;
+    font-weight: 700;
     margin-top: 1.5rem;
     margin-bottom: 0.5rem;
   }

@@ -4,7 +4,7 @@ description: "这季新番质量不错，记录一下观感和推荐。"
 publishDate: 2026-07-15
 zone: "娱乐"
 tags: ["动漫"]
-heroImage: "gallery-3.jpg"
+heroImage: "/images/gallery-3.webp"
 draft: false
 ---
 

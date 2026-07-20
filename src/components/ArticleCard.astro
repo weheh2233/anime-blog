@@ -19,7 +19,6 @@ const formattedDate = publishDate
   : '';
 const resolvedImage = resolveHeroImage(heroImage);
 ---
-
 <article
   class="card-3d group cursor-pointer overflow-hidden transition-all duration-150"
   style={{
@@ -112,10 +111,8 @@ const resolvedImage = resolveHeroImage(heroImage);
 </article>
 
 <style>
-  /* ===== 3D 倾斜容器（完整保留倾斜动画，仅修复过渡冲突） ===== */
   .card-3d {
     transform-style: preserve-3d;
-    /* transition-all 统一缓动，消除JS/CSS双重过渡打架 */
     transition: all 0.15s ease-out;
   }
 
@@ -133,7 +130,6 @@ const resolvedImage = resolveHeroImage(heroImage);
       0 12px 40px rgba(0, 0, 0, 0.35) !important;
   }
 
-  /* ===== 光泽扫过 ===== */
   .shine-sweep {
     position: absolute;
     inset: 0;
@@ -161,7 +157,6 @@ const resolvedImage = resolveHeroImage(heroImage);
     100% { transform: translateX(100%); }
   }
 
-  /* ===== Mini 3D Spiral ===== */
   .mini-spiral {
     position: absolute;
     right: 10px;
@@ -218,7 +213,6 @@ const resolvedImage = resolveHeroImage(heroImage);
     100% { transform: scale(1) rotateX(-25deg) rotateY(360deg); }
   }
 
-  /* ===== Reduced Motion 完整兼容（修复倾斜动画未禁用问题） ===== */
   @media (prefers-reduced-motion: reduce) {
     .card-3d {
       transform: none !important;
@@ -231,9 +225,7 @@ const resolvedImage = resolveHeroImage(heroImage);
 </style>
 
 <script>
-  // 3D 倾斜：跟踪鼠标位置（新增减弱动画判断，彻底规避多余渲染抖动）
   function init3DTilt() {
-    // 检测系统减弱动画偏好，匹配css媒体查询
     const motionReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (motionReduced) return;
 
@@ -260,7 +252,6 @@ const resolvedImage = resolveHeroImage(heroImage);
     });
   }
 
-  // 初始化 + Astro View Transitions 后重新绑定
   init3DTilt();
   document.addEventListener('astro:page-load', init3DTilt);
 </script>
