@@ -4,6 +4,8 @@ import markdoc from '@astrojs/markdoc';
 import keystatic from '@keystatic/astro';
 import vercel from '@astrojs/vercel';
 import tailwindcss from '@tailwindcss/vite';
+import path from 'node:path';
+import fs from 'node:fs';
 
 export default defineConfig({
   site: 'https://anime-blog.vercel.app',
@@ -12,7 +14,15 @@ export default defineConfig({
   adapter: vercel(),
 
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [
+      tailwindcss(),
+    ],
+    resolve: {
+      alias: [{
+        find: /^\.\/([^/]+)\/content\//,
+        replacement: path.resolve('src/content/posts') + '/$1/content/',
+      }],
+    },
     define: {
       'import.meta.env.KEYSTATIC_GITHUB_CLIENT_ID': JSON.stringify(process.env.KEYSTATIC_GITHUB_CLIENT_ID || ''),
       'import.meta.env.KEYSTATIC_GITHUB_CLIENT_SECRET': JSON.stringify(process.env.KEYSTATIC_GITHUB_CLIENT_SECRET || ''),
