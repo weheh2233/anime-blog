@@ -91,6 +91,22 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage);
 </BaseLayout>
 
 <style is:global>
+  /* ===== 文章主区域毛玻璃底衬 ===== */
+  article.max-w-3xl {
+    background: var(--blog-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--blog-glass-border);
+    border-radius: var(--blog-radius-xl);
+    padding: 1.5rem 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    article.max-w-3xl {
+      padding: 2rem 2.5rem;
+    }
+  }
+
   .prose-custom {
     font-size: 1.0625rem;
     line-height: 1.8;
