@@ -13,17 +13,17 @@
 | 框架 | Astro 7.x (^7.1.1) |
 | 样式 | Tailwind CSS v4 (v4.3.3) + PostCSS |
 | 内容格式 | **Markdoc**（`.mdoc`）+ 兼容 `.md` / `.mdx` |
-| CMS | Keystatic（本地 Git 存储，`/keystatic`） |
-| 部署 | Vercel 静态站点 |
-| 域名 | `https://anime-blog.vercel.app` |
+| CMS | Keystatic（GitHub 存储模式，`/keystatic`，线上可写） |
+| 部署 | Vercel SSR（`@astrojs/vercel@11`，hybrid 模式） |
+| 域名 | `https://anime-blog-zeta.vercel.app` |
 | 包管理器 | npm |
 | 语言 | TypeScript / JavaScript |
 
 ### 构建配置
 
-- **astro.config.mjs** — 集成 `@astrojs/react`、`@astrojs/markdoc`、`@keystatic/astro`（仅 dev）、`@tailwindcss/vite`
+- **astro.config.mjs** — 集成 `@astrojs/react`、`@astrojs/markdoc`、`@keystatic/astro`、`@astrojs/vercel` 适配器、`@tailwindcss/vite`；`output: 'static'` + Vite `define` 映射 KEYSTATIC 环境变量防 Rolldown 优化
 - **Tailwind 入口** — `src/styles/global.css` 中 `@import "tailwindcss"`，由 `@tailwindcss/vite` 插件处理
-- **构建命令** — `astro build && npx pagefind --site dist`（构建时生成搜索索引）
+- **构建命令** — `astro build && npx pagefind --site .vercel/output/static`
 
 > ⚠️ 历史：曾用 `@tailwindcss/postcss`（PostCSS 方式），但 Astro 7 + Rolldown 下 PostCSS import 解析不兼容导致构建失败。当前使用 `@tailwindcss/vite` 确保正确处理 `@import "tailwindcss"`。`postcss.config.mjs` 已禁用（保留为 `.disabled`）。
 
@@ -35,9 +35,12 @@
 | `@astrojs/markdoc` | ^2.0.3 |
 | `@astrojs/react` | ^6.0.1 |
 | `@keystatic/core` | ^0.5.51 |
+| `@keystatic/astro` | ^5.2.0 |
+| `@astrojs/vercel` | ^11.0.3 |
 | `tailwindcss` | ^4.0.0 |
 | `@tailwindcss/postcss` | ^4.3.3 |
 | `pagefind` | ^1.5.2 |
+| `@types/node` | （开发依赖） |
 
 ---
 
@@ -112,7 +115,7 @@ anime-blog/
 | `/projects` | `pages/projects.astro` | 项目展示 |
 | `/about` | `pages/about.astro` | 关于页（头像 + 发光环） |
 | `/404` | `pages/404.astro` | 404 |
-| `/keystatic` | Keystatic CMS | 开发模式可用，生产构建不包含 |
+| `/keystatic` | Keystatic CMS | 线上可用（GitHub 存储模式，需 OAuth 登录）|
 
 ### 路由说明
 
@@ -499,11 +502,22 @@ markdown: {
 
 ### Keystatic CMS
 
-- 地址：`/keystatic`（仅 dev 模式）
-- 存储：`kind: 'local'`（Git 同步）
+- 地址：`/keystatic`（线上可用，需 GitHub OAuth 登录）
+- 存储：`kind: 'local'`（本地 dev）/ `kind: 'github'`（线上），通过 `NODE_ENV` 切换
+- GitHub 仓库：`weheh2233/anime-blog`，使用 **GitHub App**（非 OAuth App）授权
 - 编辑器：Markdoc 编辑器，支持标题/描述/日期/专区/标签/封面图/草稿/富文本
 - 封面图上传到 `public/images/`，Markdoc 正文图片也上传到 `public/images/`
-- 不包含在生产构建中（`astro.config.mjs` 条件引用）
+- 构建时始终加载（无 `isDev` 守卫）
+
+#### Vercel 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `KEYSTATIC_GITHUB_CLIENT_ID` | GitHub App 的 Client ID |
+| `KEYSTATIC_GITHUB_CLIENT_SECRET` | 对应的 Client Secret |
+| `KEYSTATIC_SECRET` | `crypto.randomBytes(32).toString('hex')` 生成的 64 位字符串 |
+
+> ⚠️ Rolldown 打包时会将 `import.meta.env.KEYSTATIC_*` 优化为 `undefined`，需在 `astro.config.mjs` 的 `vite.define` 中映射到 `process.env.KEYSTATIC_*` 以在运行时读取。详见 `astro.config.mjs` 的 `vite.define` 配置。
 
 ### 博客列表客户端筛选
 
