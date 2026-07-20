@@ -23,6 +23,8 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage);
 <BaseLayout title={post.data.title} description={post.data.description} hideSidebar>
   <ReadingProgress />
   <article class="max-w-3xl mx-auto" itemscope itemtype="https://schema.org/Article">
+    <!-- 文章主体（data-pagefind-body 限制只索引此区域） -->
+    <div data-pagefind-body>
     <!-- 文章头 -->
     <header class="mb-10">
       <h1 class="text-3xl md:text-4xl font-bold mb-4 leading-tight" style="color: var(--blog-text-primary);" itemprop="headline">
@@ -80,6 +82,7 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage);
     </div>
 
     <!-- 文章末尾分隔 -->
+    </div>
     <hr class="my-12" style="border-color: var(--blog-border);" />
 
     <!-- 评论区 -->

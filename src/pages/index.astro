@@ -31,7 +31,7 @@ const posts = allPosts.slice(0, 18);
     </div>
 
     {posts.length > 0 ? (
-      <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-pagefind-ignore>
         {posts.map((post, i) => (
           <ScrollReveal index={i}>
             <ArticleCard
@@ -48,17 +48,16 @@ const posts = allPosts.slice(0, 18);
         ))}
       </div>
     ) : (
-      <div class="text-center py-20">
+      <div class="text-center py-20" data-pagefind-ignore>
         <p class="text-lg" style="color: var(--blog-text-tertiary);">还没有文章，敬请期待</p>
       </div>
     )}
   </section>
 
-  <!-- 动漫装饰位提示 -->
+  <!-- 待定区域：动漫/追番展示位 -->
   <section class="max-w-7xl mx-auto px-4 md:px-6 pb-16">
-    <div class="rounded-[var(--blog-radius-xl)] p-12 text-center border-2 border-dashed" style="border-color: var(--blog-border); background: var(--blog-surface);">
-      <p class="text-lg mb-2" style="color: var(--blog-text-tertiary);">🎌 ここにキャラクターを配置</p>
-      <p class="text-sm" style="color: var(--blog-text-tertiary);">此处预留了角色图展示位，你可以放上喜欢的二次元图片</p>
+    <div class="rounded-[var(--blog-radius-xl)] p-12 text-center" style="background: var(--blog-surface); border: 1px solid var(--blog-border-light);">
+      <p class="text-base" style="color: var(--blog-text-tertiary);">🎌 待定 · 追番/动漫展示</p>
     </div>
   </section>
 </BaseLayout>

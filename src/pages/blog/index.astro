@@ -19,7 +19,7 @@ allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueO
     <ZoneFilter basePath="/blog" />
   </div>
 
-  <div id="post-grid" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+  <div id="post-grid" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-pagefind-ignore>
     {allPosts.length > 0 ? (
       allPosts.map((post, i) => (
         <div class="post-item" data-zone={post.data.zone}>

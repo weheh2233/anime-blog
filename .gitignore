@@ -25,3 +25,6 @@ keystatic-local.db
 
 # Vercel build output
 .vercel/
+
+# Pagefind search index (build artifact, synced from build)
+public/pagefind/

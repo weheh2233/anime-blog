@@ -173,42 +173,24 @@
     const backdrop = document.getElementById('search-backdrop');
     if (!modal || !input || !results) return;
 
-    let pagefindReady = false;
     let activeIdx = -1;
     let resultItems: HTMLElement[] = [];
     let debounceTimer: ReturnType<typeof setTimeout>;
 
-    // 加载 Pagefind（通过 script 标签避免 Vite 打包分析）
-    function loadPagefind(): Promise<any> {
-      return new Promise((resolve, reject) => {
-        // 检查是否已加载
-        if ((window as any).pagefind) {
-          resolve((window as any).pagefind);
-          return;
-        }
-        const script = document.createElement('script');
-        script.src = '/pagefind/pagefind.js';
-        script.onload = () => {
-          const pf = (window as any).pagefind;
-          if (pf) {
-            pf.options?.({ basePath: '/pagefind/' });
-            pagefindReady = true;
-            resolve(pf);
-          } else {
-            reject(new Error('Pagefind failed to init'));
-          }
-        };
-        script.onerror = () => reject(new Error('Pagefind not available'));
-        document.head.appendChild(script);
-      });
-    }
-
-    let pagefindP = new Promise<any>((resolve) => {
-      // dev 模式下 Pagefind 索引不存在，直接跳过
-      fetch('/pagefind/pagefind.js', { method: 'HEAD', signal: AbortSignal.timeout(2000) })
-        .then(r => { if (r.ok) resolve(loadPagefind()); else resolve(null); })
-        .catch(() => resolve(null));
-    });
+    // fetch pagefind.js → Blob URL → dynamic import，彻底绕过 Vite 打包
+    let pagefindP = (async (): Promise<any> => {
+      try {
+        const resp = await fetch('/pagefind/pagefind.js');
+        const code = await resp.text();
+        const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+        const pf = await (import(/* @vite-ignore */ url) as Promise<any>);
+        URL.revokeObjectURL(url);
+        await pf.options({ basePath: '/pagefind/' });
+        return pf;
+      } catch {
+        return null;
+      }
+    })();
 
     function open() {
       modal.classList.add('open');
