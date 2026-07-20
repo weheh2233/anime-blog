@@ -10,13 +10,15 @@ const ZONES = [
 ];
 
 export default config({
-  storage: {
-    kind: 'github',
-    repo: {
-      owner: 'weheh2233',
-      name: 'anime-blog',
-    },
-  },
+  storage: process.env.NODE_ENV === 'production'
+    ? {
+        kind: 'github',
+        repo: {
+          owner: 'weheh2233',
+          name: 'anime-blog',
+        },
+      }
+    : { kind: 'local' },
 
   collections: {
     posts: collection({
