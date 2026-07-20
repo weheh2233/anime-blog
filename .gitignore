@@ -22,3 +22,6 @@ Thumbs.db
 
 # Keystatic CMS local
 keystatic-local.db
+
+# Vercel build output
+.vercel/

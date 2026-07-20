@@ -11,7 +11,11 @@ const ZONES = [
 
 export default config({
   storage: {
-    kind: 'local',
+    kind: 'github',
+    repo: {
+      owner: 'weheh2233',
+      name: 'anime-blog',
+    },
   },
 
   collections: {
