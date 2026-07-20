@@ -95,10 +95,10 @@ const recentPosts = allPosts.slice(0, 4);
   const locEl = document.getElementById('sidebar-location');
   if (locEl) {
     try {
-      fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) })
+      fetch('https://ipinfo.io/json', { signal: AbortSignal.timeout(3000) })
         .then(r => r.json())
         .then(d => {
-          const parts = [d.city, d.region, d.country_name].filter(Boolean);
+          const parts = [d.city, d.region, d.country].filter(Boolean);
           locEl.textContent = '来自 ' + (parts.join(', ') || '未知');
         })
         .catch(() => { locEl.textContent = '无法获取位置'; });

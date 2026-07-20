@@ -34,10 +34,10 @@ import { SITE } from '../consts';
   const locEl = document.getElementById('visitor-location');
   if (locEl) {
     try {
-      fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) })
+      fetch('https://ipinfo.io/json', { signal: AbortSignal.timeout(3000) })
         .then(r => r.json())
         .then(d => {
-          const loc = [d.city, d.country_name].filter(Boolean).join(', ');
+          const loc = [d.city, d.country].filter(Boolean).join(', ');
           if (loc) locEl.textContent = '· 🌍 ' + loc;
         })
         .catch(() => {});
