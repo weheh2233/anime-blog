@@ -5,7 +5,6 @@ import keystatic from '@keystatic/astro';
 import vercel from '@astrojs/vercel';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
-import fs from 'node:fs';
 
 export default defineConfig({
   site: 'https://anime-blog.vercel.app',

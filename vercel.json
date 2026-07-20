@@ -1,6 +1,4 @@
 {
   "framework": "astro",
-  "installCommand": "npm ci",
-  "cleanUrls": true,
-  "trailingSlash": false
+  "installCommand": "npm ci"
 }
