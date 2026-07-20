@@ -34,9 +34,10 @@ interface Props {
   title: string;
   description?: string;
   hideSidebar?: boolean;
+  showToc?: boolean;
 }
 
-const { title, description, hideSidebar } = Astro.props;
+const { title, description, hideSidebar, showToc } = Astro.props;
 ---
 
 <!doctype html>
@@ -82,13 +83,157 @@ const { title, description, hideSidebar } = Astro.props;
 
     <!-- 主内容区 -->
     <div class="flex-1 pt-[var(--blog-header-h)] flex" transition:animate="slide">
-      <div class="mx-auto w-full px-4 md:px-8 flex gap-10 py-8" style="max-width: 1500px;">
+      <div class="mx-auto w-full px-4 md:px-8 flex gap-4 py-8" style="max-width: 1500px;">
+        {showToc && (
+          <aside class="hidden lg:block shrink-0 self-start sticky overflow-y-auto" style="min-width: 180px; width: 200px; top: calc(var(--blog-header-h) + 24px); max-height: calc(100vh - var(--blog-header-h) - 48px);">
+            <div style="background: var(--blog-surface); border: 1px solid var(--blog-border); border-radius: var(--blog-radius-lg); padding: 0.875rem 0.75rem;" data-pagefind-ignore>
+              <h3 class="text-xs font-semibold mb-3 tracking-wider" style="color: var(--blog-text-tertiary);">📖 目录</h3>
+              <nav id="article-toc" class="toc-tree"></nav>
+            </div>
+            <style>
+              .toc-tree {
+                position: relative;
+                padding-left: 18px;
+              }
+              .toc-tree::before {
+                content: '';
+                position: absolute;
+                left: 6px;
+                top: 5px;
+                bottom: 5px;
+                width: 1.5px;
+                background: var(--blog-text-tertiary);
+                border-radius: 1px;
+              }
+              .toc-item {
+                display: flex;
+                align-items: flex-start;
+                gap: 6px;
+                padding: 3px 0;
+                position: relative;
+                cursor: pointer;
+              }
+              .toc-item a {
+                color: var(--blog-text-secondary);
+                text-decoration: none;
+                font-size: 0.8125rem;
+                line-height: 1.5;
+                transition: color 0.15s;
+                word-break: break-word;
+              }
+              .toc-item a:hover {
+                color: var(--blog-accent);
+              }
+              .toc-item.active a {
+                color: var(--blog-accent);
+                font-weight: 500;
+              }
+              .toc-dot {
+                flex-shrink: 0;
+                border-radius: 50%;
+                background: var(--blog-text-tertiary);
+                margin-top: 5px;
+                position: relative;
+                z-index: 1;
+                transition: background 0.15s, box-shadow 0.15s;
+              }
+              .toc-item-h2 .toc-dot {
+                width: 7px;
+                height: 7px;
+                margin-left: -2px;
+              }
+              .toc-item-h3 .toc-dot {
+                width: 5px;
+                height: 5px;
+                margin-left: -1px;
+              }
+              .toc-item-h3 {
+                padding-left: 6px;
+              }
+              .toc-item-h3::before {
+                content: '';
+                position: absolute;
+                left: -12px;
+                top: 50%;
+                width: 10px;
+                height: 1.5px;
+                background: var(--blog-text-tertiary);
+              }
+              .toc-item.active .toc-dot {
+                background: var(--blog-accent);
+                box-shadow: 0 0 0 3px var(--blog-accent-light);
+              }
+            </style>
+            <script is:inline>
+              (function() {
+                function buildTOC() {
+                  const article = document.querySelector('[itemprop="articleBody"]');
+                  const toc = document.getElementById('article-toc');
+                  if (!article || !toc) return;
+
+                  const headings = article.querySelectorAll('h2, h3');
+                  if (headings.length === 0) {
+                    toc.parentElement.style.display = 'none';
+                    return;
+                  }
+
+                  headings.forEach((h, i) => {
+                    const id = 'toc-' + i;
+                    h.id = id;
+
+                    const item = document.createElement('div');
+                    item.className = 'toc-item ' + (h.tagName === 'H3' ? 'toc-item-h3' : 'toc-item-h2');
+
+                    const dot = document.createElement('span');
+                    dot.className = 'toc-dot';
+                    item.appendChild(dot);
+
+                    const a = document.createElement('a');
+                    a.href = '#' + id;
+                    a.textContent = h.textContent;
+                    item.appendChild(a);
+
+                    a.addEventListener('click', (e) => {
+                      e.preventDefault();
+                      h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      history.pushState(null, '', '#' + id);
+                    });
+
+                    toc.appendChild(item);
+                  });
+
+                  const items = toc.querySelectorAll('.toc-item');
+                  function onScroll() {
+                    let current = -1;
+                    headings.forEach((h, i) => {
+                      const rect = h.getBoundingClientRect();
+                      if (rect.top <= 130) current = i;
+                    });
+                    items.forEach((item, i) => {
+                      item.classList.toggle('active', i === current);
+                    });
+                  }
+                  window.addEventListener('scroll', onScroll, { passive: true });
+                  onScroll();
+                }
+
+                if (document.readyState === 'loading') {
+                  document.addEventListener('DOMContentLoaded', buildTOC);
+                } else {
+                  buildTOC();
+                }
+                document.addEventListener('astro:page-load', buildTOC);
+              })();
+            </script>
+          </aside>
+        )}
+
         <main class="flex-1 min-w-0">
           <slot />
         </main>
 
-        {!hideSidebar && (
-          <aside class="hidden xl:block shrink-0 self-start sticky overflow-y-auto" style="width: var(--blog-sidebar-w); top: calc(var(--blog-header-h) + 24px); max-height: calc(100vh - var(--blog-header-h) - 48px);">
+        {!hideSidebar && !showToc && (
+          <aside class="hidden lg:block shrink-0 self-start sticky overflow-y-auto" style="width: var(--blog-sidebar-w); top: calc(var(--blog-header-h) + 24px); max-height: calc(100vh - var(--blog-header-h) - 48px);">
             <Sidebar />
           </aside>
         )}

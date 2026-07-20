@@ -6,7 +6,12 @@ import ScrollReveal from '../../components/ScrollReveal.astro';
 import { getCollection } from 'astro:content';
 
 const allPosts = await getCollection('posts', ({ data }) => !data.draft);
-allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf());
+allPosts.sort((a, b) => {
+  if (a.data.pinned !== b.data.pinned) return a.data.pinned ? -1 : 1;
+  const dateCmp = b.data.publishDate.valueOf() - a.data.publishDate.valueOf();
+  if (dateCmp !== 0) return dateCmp;
+  return b.id.localeCompare(a.id);
+});
 ---
 
 <BaseLayout title="博客" description="博客文章列表">
@@ -32,6 +37,7 @@ allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueO
               tags={post.data.tags}
               publishDate={post.data.publishDate}
               heroImage={post.data.heroImage}
+              pinned={post.data.pinned}
               loading={i < 6 ? 'eager' : 'lazy'}
             />
           </ScrollReveal>

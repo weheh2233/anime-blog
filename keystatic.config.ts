@@ -63,6 +63,11 @@ export default config({
           label: '草稿',
           defaultValue: false,
         }),
+        pinned: fields.checkbox({
+          label: '置顶',
+          description: '勾选后文章将始终排在首页和博客列表最前面',
+          defaultValue: false,
+        }),
         content: fields.markdoc({
           label: '正文',
           formatting: {
