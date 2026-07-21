@@ -3,13 +3,22 @@ interface Props {
   title?: string;
   subtitle?: string;
   showSpiral?: boolean;
+  lines?: string[];
 }
 
-const { title, subtitle, showSpiral = true } = Astro.props;
-  import { gallery1, gallery2, gallery3, avatar, heroBanner } from '../lib/imageMap';
+const {
+  title,
+  subtitle,
+  showSpiral = true,
+  lines = [
+    '正在和世界解耦。',
+    '说出去的话就像射出的飞矢，想收也收不回了。最好的方式还是沉默，唯有在无言中才能言尽一切，追溯到能指链条的起源之地，从而由你带领它走向终结。',
+    '无尽的远方，无穷的人们，都与我有关。',
+  ],
+} = Astro.props;
+import { gallery1, gallery2, gallery3, avatar, heroBanner } from '../lib/imageMap';
 const totalCards = 16;
 
-// 旋转卡片中用的图片 — 全部 5 张 + CSS 滤镜衍生更多变体
 const cardImages = [
   gallery1.src,
   gallery2.src,
@@ -18,7 +27,6 @@ const cardImages = [
   heroBanner.src,
 ];
 
-// 每张卡片的 CSS filter 变体（循环使用），让 16 张卡片视觉上不重复
 const cardFilters = [
   '',
   'hue-rotate(15deg) saturate(1.1)',
@@ -32,7 +40,6 @@ const cardFilters = [
 ---
 
 <section class="relative min-h-[65vh] flex items-center overflow-hidden">
-  <!-- 亚克力旋转卡片墙 -->
   {showSpiral && (
     <div class="acrylic-carousel hidden md:block" aria-hidden="true">
       <div class="carousel-core">
@@ -40,12 +47,9 @@ const cardFilters = [
           Array.from({ length: totalCards }, (_, i) => (
             <div class="acrylic-card" style={{ '--i': i, '--total': totalCards }}>
               <div class="acrylic-inner">
-                <!-- 内层图片 -->
                 <div class="acrylic-image" style={`background-image: url(${cardImages[i % cardImages.length]}); background-size: cover; background-position: center; filter: ${cardFilters[i % cardFilters.length]};`} />
-                <!-- 亚克力玻璃光泽 -->
                 <div class="acrylic-shine" />
               </div>
-              <!-- 底部厚度（亚克力板边缘） -->
               <div class="acrylic-edge" />
             </div>
           ))
@@ -68,13 +72,14 @@ const cardFilters = [
       <p class="scroll-reveal text-lg md:text-xl mb-8 leading-relaxed" style="color: var(--blog-text-secondary);" data-delay="1">
         {Astro.slots.has('default') ? <slot /> : '一个喜欢动漫的开发者博客'}
       </p>
+      <div class="hero-card">
+        <p class="hero-type-line" data-hero-lines={JSON.stringify(lines)}></p>
+      </div>
     </div>
-
   </div>
 </section>
 
 <style>
-  /* ===== 亚克力旋转卡片墙 ===== */
   .acrylic-carousel {
     position: absolute;
     right: -60px;
@@ -94,7 +99,6 @@ const cardFilters = [
     animation: spin 16s linear infinite;
   }
 
-  /* 外层大环 */
   .acrylic-card {
     position: absolute;
     left: 50%;
@@ -106,7 +110,6 @@ const cardFilters = [
     transform: rotateY(calc(var(--i) * 360deg / var(--total))) translateZ(200px);
   }
 
-  /* 交替放入内环 */
   .acrylic-card:nth-child(odd) {
     width: 64px;
     height: 88px;
@@ -114,7 +117,6 @@ const cardFilters = [
     transform: rotateY(calc(var(--i) * 360deg / var(--total))) translateZ(120px);
   }
 
-  /* 卡片主体 — 亚克力玻璃效果 */
   .acrylic-inner {
     width: 100%;
     height: 100%;
@@ -130,13 +132,11 @@ const cardFilters = [
       inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   }
 
-  /* 暗色下亚克力面板调整 */
   :root.dark .acrylic-inner {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.12);
   }
 
-  /* 内层图片/渐变 */
   .acrylic-image {
     width: 100%;
     height: 100%;
@@ -144,7 +144,6 @@ const cardFilters = [
     z-index: 0;
   }
 
-  /* 亚克力表面光泽 */
   .acrylic-shine {
     position: absolute;
     inset: 0;
@@ -159,7 +158,6 @@ const cardFilters = [
     pointer-events: none;
   }
 
-  /* 底部厚度（亚克力板的切面边缘） */
   .acrylic-edge {
     position: absolute;
     bottom: -6px;
@@ -186,7 +184,6 @@ const cardFilters = [
     to   { transform: rotateX(-8deg) rotateY(360deg); }
   }
 
-  /* ===== ScrollReveal for Hero text ===== */
   .scroll-reveal {
     opacity: 0;
     transform: translateY(30px);
@@ -204,6 +201,44 @@ const cardFilters = [
     }
   }
 
+  .hero-card {
+    max-width: 36rem;
+    padding: 1.25rem 1.75rem;
+    border-radius: var(--blog-radius-lg);
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.03);
+  }
+
+  :root.dark .hero-card {
+    background: rgba(26, 29, 39, 0.5);
+    border-color: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.18);
+  }
+
+  .hero-type-line {
+    margin: 0;
+    color: var(--blog-text-primary);
+    font-size: clamp(1rem, 1.2vw, 1.2rem);
+    font-weight: 600;
+    line-height: 1.7;
+    transition: opacity 0.24s ease;
+  }
+
+  .hero-type-line.is-typing::after {
+    content: '|';
+    display: inline-block;
+    margin-left: 0.12em;
+    color: var(--blog-accent);
+    animation: caretBlink 0.72s step-end infinite;
+  }
+
+  @keyframes caretBlink {
+    50% { opacity: 0; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .acrylic-carousel { display: none; }
     .scroll-reveal {
@@ -211,5 +246,55 @@ const cardFilters = [
       transform: none;
       animation: none;
     }
+    .hero-type-line::after { display: none; }
   }
 </style>
+
+<script>
+  function runHeroLineTyping() {
+    const line = document.querySelector<HTMLElement>('.hero-type-line[data-hero-lines]');
+    if (!line || line.dataset.typed === 'true') return;
+
+    let texts = [''];
+    try {
+      texts = JSON.parse(line.dataset.heroLines || '[""]');
+    } catch (_) {
+      texts = [''];
+    }
+
+    const candidates = texts.filter((text) => text.trim().length > 0);
+    const text = candidates[Math.floor(Math.random() * candidates.length)] || '';
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    line.dataset.typed = 'true';
+
+    if (reduceMotion) {
+      line.textContent = text;
+      return;
+    }
+
+    line.textContent = '';
+    line.classList.add('is-typing');
+
+    let index = 0;
+    const typeNext = () => {
+      line.textContent = text.slice(0, index);
+      if (index >= text.length) {
+        line.classList.remove('is-typing');
+        return;
+      }
+      index += 1;
+      window.setTimeout(typeNext, text.length > 40 ? 42 : 82);
+    };
+
+    window.setTimeout(typeNext, 220);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runHeroLineTyping, { once: true });
+  } else {
+    runHeroLineTyping();
+  }
+
+  document.addEventListener('astro:page-load', runHeroLineTyping);
+</script>
