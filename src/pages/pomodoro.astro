@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { PomodoroTimer } from '../components/PomodoroTimer';
+import '../styles/pomodoro-tokens.css';
+import '../styles/pomodoro-rain-glass.css';
+import '../styles/pomodoro-page.css';
+import '../styles/pomodoro-panels.css';
+---
+
+<BaseLayout title="番茄钟" description="专注、休息、待办和今日完成记录" hideSidebar>
+  <div class="pomodoro-page">
+    <PomodoroTimer client:load />
+  </div>
+</BaseLayout>

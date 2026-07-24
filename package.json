@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build && npx pagefind --site .vercel/output/static --glob \"**/blog/**/*.html\" && cp -r .vercel/output/static/pagefind public/pagefind",
+    "dev": "node scripts/dev.mjs",
+    "build": "astro build && npx pagefind --site .vercel/output/static --glob \"**/blog/**/*.html\" && node scripts/copy-pagefind.mjs",
     "preview": "astro preview",
     "astro": "astro"
   },

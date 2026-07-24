@@ -1,0 +1,62 @@
+.pomodoro-page,
+.pomodoro-sidebar-card {
+  --pomodoro-rain-glass-fill: rgba(255, 255, 255, 0.54);
+  --pomodoro-rain-glass-fill-strong: rgba(255, 255, 255, 0.72);
+  --pomodoro-rain-glass-border: rgba(44, 61, 88, 0.18);
+  --pomodoro-rain-glass-rim: rgba(255, 255, 255, 0.84);
+  --pomodoro-rain-glass-sheen: rgba(255, 255, 255, 0.28);
+  --pomodoro-rain-drop-static: rgba(255, 255, 255, 0.32);
+  --pomodoro-rain-drop-animated: rgba(255, 255, 255, 0.42);
+  --pomodoro-rain-drop-shadow: rgba(59, 74, 107, 0.24);
+  --pomodoro-control-fill: rgba(255, 255, 255, 0.68);
+  --pomodoro-control-fill-strong: rgba(255, 255, 255, 0.88);
+  --pomodoro-focus-ring: rgba(90, 122, 158, 0.42);
+  --pomodoro-success: #3f6b5b;
+  --pomodoro-success-soft: rgba(63, 107, 91, 0.12);
+  --pomodoro-warning: #8a6a2f;
+  --pomodoro-warning-soft: rgba(138, 106, 47, 0.14);
+  --pomodoro-danger: #8b4a4a;
+  --pomodoro-danger-soft: rgba(139, 74, 74, 0.12);
+  --pomodoro-panel-shadow: 0 18px 48px rgba(59, 74, 107, 0.18);
+  --pomodoro-background-slot-fill: linear-gradient(145deg, rgba(17, 24, 28, 0.08), rgba(59, 74, 107, 0.08) 48%, rgba(255, 255, 255, 0.22));
+  --pomodoro-background-slot-grid: rgba(17, 24, 28, 0.08);
+  --pomodoro-background-slot-vignette: rgba(17, 24, 28, 0.18);
+  --pomodoro-droplet-duration-a: 26s;
+  --pomodoro-droplet-duration-b: 34s;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --pomodoro-panel-max: 560px;
+}
+
+.dark .pomodoro-page,
+.dark .pomodoro-sidebar-card {
+  --pomodoro-rain-glass-fill: rgba(20, 24, 33, 0.72);
+  --pomodoro-rain-glass-fill-strong: rgba(31, 37, 49, 0.84);
+  --pomodoro-rain-glass-border: rgba(164, 182, 214, 0.12);
+  --pomodoro-rain-glass-rim: rgba(232, 237, 247, 0.34);
+  --pomodoro-rain-glass-sheen: rgba(255, 255, 255, 0.18);
+  --pomodoro-rain-drop-static: rgba(232, 237, 247, 0.22);
+  --pomodoro-rain-drop-animated: rgba(232, 237, 247, 0.3);
+  --pomodoro-rain-drop-shadow: rgba(17, 24, 28, 0.28);
+  --pomodoro-control-fill: rgba(26, 29, 39, 0.62);
+  --pomodoro-control-fill-strong: rgba(31, 37, 49, 0.86);
+  --pomodoro-focus-ring: rgba(90, 122, 158, 0.54);
+  --pomodoro-success: #7fb09c;
+  --pomodoro-success-soft: rgba(127, 176, 156, 0.14);
+  --pomodoro-warning: #c3a05a;
+  --pomodoro-warning-soft: rgba(195, 160, 90, 0.14);
+  --pomodoro-danger: #c88585;
+  --pomodoro-danger-soft: rgba(200, 133, 133, 0.14);
+  --pomodoro-panel-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  --pomodoro-background-slot-fill: linear-gradient(145deg, rgba(17, 24, 28, 0.22), rgba(90, 122, 158, 0.16) 48%, rgba(255, 255, 255, 0.08));
+  --pomodoro-background-slot-grid: rgba(232, 237, 247, 0.08);
+  --pomodoro-background-slot-vignette: rgba(17, 24, 28, 0.36);
+}
