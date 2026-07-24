@@ -1,0 +1,147 @@
+<audio id="global-music-audio" preload="metadata" aria-hidden="true" transition:persist></audio>
+
+<script>
+  const bootMusic = () => {
+    if (window.__musicPlayer) return;
+    const audio = document.getElementById('global-music-audio') as HTMLAudioElement | null;
+    if (!audio) return;
+
+    let state: MusicState = {
+      tracks: [],
+      currentIndex: -1,
+      currentTrack: null,
+      status: 'loading',
+      error: null,
+    };
+    const listeners = new Set<(nextState: MusicState) => void>();
+    const failedTrackIds = new Set<number>();
+    let loadingPromise: Promise<void> | null = null;
+
+    const emit = () => {
+      window.dispatchEvent(new CustomEvent('music:state-change', { detail: state }));
+      listeners.forEach((listener) => listener(state));
+    };
+
+    const setState = (patch: Partial<MusicState>) => {
+      state = { ...state, ...patch };
+      emit();
+    };
+
+    const loadTracks = async () => {
+      if (loadingPromise) return loadingPromise;
+      loadingPromise = fetch('/api/music/daily')
+        .then(async (response) => {
+          const payload = await response.json() as { tracks?: MusicTrack[]; error?: string };
+          if (!response.ok || !payload.tracks?.length) {
+            throw new Error(payload.error || '暂无可播放的每日推荐');
+          }
+          setState({
+            tracks: payload.tracks,
+            currentIndex: 0,
+            currentTrack: payload.tracks[0],
+            status: 'ready',
+            error: null,
+          });
+        })
+        .catch((error: unknown) => {
+          setState({
+            status: 'error',
+            error: error instanceof Error ? error.message : '音乐加载失败',
+          });
+        });
+      return loadingPromise;
+    };
+
+    const setTrack = (index: number, skipFailed = false) => {
+      if (!state.tracks.length) return;
+      let currentIndex = (index + state.tracks.length) % state.tracks.length;
+      if (skipFailed) {
+        for (let offset = 0; offset < state.tracks.length; offset += 1) {
+          const candidate = (currentIndex + offset) % state.tracks.length;
+          if (!failedTrackIds.has(state.tracks[candidate].id)) {
+            currentIndex = candidate;
+            break;
+          }
+        }
+      }
+      const currentTrack = state.tracks[currentIndex];
+      audio.src = currentTrack.url;
+      setState({ currentIndex, currentTrack, status: 'ready', error: null });
+    };
+
+    const play = async () => {
+      await loadTracks();
+      if (!state.currentTrack || state.status === 'error') return;
+      if (audio.src !== state.currentTrack.url) audio.src = state.currentTrack.url;
+      try {
+        await audio.play();
+        setState({ status: 'playing', error: null });
+      } catch {
+        setState({ status: 'blocked', error: '点击播放按钮开始音乐' });
+      }
+    };
+
+    const pause = () => {
+      audio.pause();
+      setState({ status: 'paused' });
+    };
+
+    const next = async () => {
+      await loadTracks();
+      if (!state.tracks.length) return;
+      if (failedTrackIds.size >= state.tracks.length) {
+        setState({ status: 'error', error: '今日推荐歌曲暂时都无法播放' });
+        return;
+      }
+      setTrack(state.currentIndex + 1, true);
+      await play();
+    };
+
+    const previous = async () => {
+      await loadTracks();
+      setTrack(state.currentIndex - 1);
+      await play();
+    };
+
+    audio.addEventListener('play', () => setState({ status: 'playing', error: null }));
+    audio.addEventListener('pause', () => {
+      if (!audio.ended) setState({ status: 'paused' });
+    });
+    audio.addEventListener('ended', () => { void next(); });
+    audio.addEventListener('error', () => {
+      if (state.currentTrack) failedTrackIds.add(state.currentTrack.id);
+      void next();
+    });
+
+    window.__musicPlayer = {
+      getState: () => state,
+      play,
+      pause,
+      toggle: async () => (state.status === 'playing' ? pause() : play()),
+      next,
+      previous,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        listener(state);
+        return () => listeners.delete(listener);
+      },
+    };
+
+    void loadTracks().then(() => {
+      if (state.status === 'ready') void play();
+    });
+  };
+
+  bootMusic();
+  document.addEventListener('astro:page-load', bootMusic);
+</script>
+
+<style>
+  #global-music-audio {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+</style>

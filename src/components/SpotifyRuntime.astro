@@ -1,0 +1,141 @@
+<div id="spotify-music-embed" aria-hidden="true" transition:persist></div>
+
+<script>
+  const SPOTIFY_PLAYLIST_URI = 'spotify:playlist:2qlP48eZh7Opk8DzGbC8b4';
+
+  const bootSpotify = () => {
+    if (window.__musicPlayer) return;
+    const target = document.getElementById('spotify-music-embed');
+    if (!target) return;
+
+    let state: MusicState = {
+      tracks: [],
+      currentIndex: 0,
+      currentTrack: null,
+      status: 'loading',
+      error: null,
+    };
+    const listeners = new Set<(nextState: MusicState) => void>();
+    let controller: any = null;
+    let readyPromise: Promise<void> | null = null;
+
+    const emit = () => {
+      window.dispatchEvent(new CustomEvent('music:state-change', { detail: state }));
+      listeners.forEach((listener) => listener(state));
+    };
+
+    const setState = (patch: Partial<MusicState>) => {
+      state = { ...state, ...patch };
+      emit();
+    };
+
+    const handlePlaybackUpdate = (event: any) => {
+      const data = event?.data || event;
+      const track = data?.track_window?.current_track;
+      const currentTrack = track ? {
+        id: track.uri || track.id || 'spotify-track',
+        name: track.name || 'Spotify playlist',
+        artists: (track.artists || []).map((artist: any) => artist.name).filter(Boolean),
+        album: track.album?.name || 'Spotify',
+        cover: track.album?.images?.[0]?.url || '',
+        duration: track.duration_ms || 0,
+        url: track.uri || '',
+      } satisfies MusicTrack : state.currentTrack;
+
+      setState({
+        currentTrack,
+        status: data?.is_paused === false ? 'playing' : 'paused',
+        error: null,
+      });
+    };
+
+    const ensureSpotify = () => {
+      if (readyPromise) return readyPromise;
+
+      readyPromise = new Promise<void>((resolve, reject) => {
+        const initialize = (iframeApi: any) => {
+          try {
+            iframeApi.createController(target, {
+              uri: SPOTIFY_PLAYLIST_URI,
+              width: '320',
+              height: '152',
+            }, (nextController: any) => {
+              controller = nextController;
+              controller.addListener('playback_update', handlePlaybackUpdate);
+              setState({ status: 'ready', error: null });
+              resolve();
+            });
+          } catch (error) {
+            reject(error);
+          }
+        };
+
+        window.onSpotifyIframeApiReady = initialize;
+        const script = document.createElement('script');
+        script.src = 'https://open.spotify.com/embed/iframe-api/v1';
+        script.async = true;
+        script.onerror = () => reject(new Error('Spotify 播放器加载失败'));
+        document.head.appendChild(script);
+      }).catch((error: unknown) => {
+        setState({
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Spotify 播放器加载失败',
+        });
+      });
+
+      return readyPromise;
+    };
+
+    const play = async () => {
+      await ensureSpotify();
+      if (!controller) return;
+      controller.play();
+      setState({ status: 'playing', error: null });
+    };
+
+    const pause = () => {
+      controller?.pause();
+      setState({ status: 'paused' });
+    };
+
+    const next = async () => {
+      await ensureSpotify();
+      controller?.skipToNext();
+    };
+
+    const previous = async () => {
+      await ensureSpotify();
+      controller?.skipToPrevious();
+    };
+
+    window.__musicPlayer = {
+      getState: () => state,
+      play,
+      pause,
+      toggle: async () => (state.status === 'playing' ? pause() : play()),
+      next,
+      previous,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        listener(state);
+        return () => listeners.delete(listener);
+      },
+    };
+
+    void ensureSpotify();
+  };
+
+  bootSpotify();
+  document.addEventListener('astro:page-load', bootSpotify);
+</script>
+
+<style>
+  #spotify-music-embed {
+    position: fixed;
+    top: 0;
+    left: -10000px;
+    width: 320px;
+    height: 152px;
+    overflow: hidden;
+  }
+</style>
