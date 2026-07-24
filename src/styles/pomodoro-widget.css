@@ -1,3 +1,14 @@
+.eyebrow,
+.pomodoro-sidebar-card__eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--blog-text-tertiary);
+  font-family: var(--blog-font-mono);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
 .pomodoro-widget {
   width: min(100%, 420px);
   min-height: 208px;

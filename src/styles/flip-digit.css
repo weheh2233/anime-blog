@@ -1,0 +1,153 @@
+/* Flip digit timer */
+
+.flip-digit {
+  --digit-w: 1.05em;
+  --digit-h: 1.4em;
+  --digit-fs: 2.75rem;
+  --digit-radius: 6px;
+  --digit-bg: #1a1d2b;
+  --digit-color: #e8edf7;
+  --digit-divider: rgba(0, 0, 0, 0.5);
+  --digit-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+
+  position: relative;
+  display: inline-flex;
+  width: var(--digit-w);
+  height: var(--digit-h);
+  font-size: var(--digit-fs);
+  line-height: var(--digit-h);
+  border-radius: var(--digit-radius);
+  background: var(--digit-bg);
+  box-shadow: var(--digit-shadow);
+  perspective: 400px;
+  user-select: none;
+}
+
+.flip-digit__upper,
+.flip-digit__lower {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--digit-bg);
+}
+
+.flip-digit__upper {
+  top: 0;
+  border-radius: var(--digit-radius) var(--digit-radius) 0 0;
+}
+
+.flip-digit__lower {
+  bottom: 0;
+  border-radius: 0 0 var(--digit-radius) var(--digit-radius);
+  border-top: 1px solid var(--digit-divider);
+}
+
+/*
+ * Every face keeps the same full digit height. The half containers only
+ * reveal the required half, so the center line is shared by static and
+ * animated faces.
+ */
+.flip-digit__num {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--digit-h);
+  color: var(--digit-color);
+  font-family: var(--blog-font-mono, "SF Mono", "Fira Code", monospace);
+  font-weight: 700;
+  font-size: inherit;
+  line-height: var(--digit-h);
+  -webkit-font-smoothing: antialiased;
+}
+
+.flip-digit__lower .flip-digit__num,
+.flip-digit__bottom-flip .flip-digit__num {
+  top: calc(var(--digit-h) * -0.5);
+}
+
+.flip-digit__top-flip,
+.flip-digit__bottom-flip {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+  backface-visibility: hidden;
+  z-index: 2;
+  background: var(--digit-bg);
+}
+
+.flip-digit__top-flip {
+  top: 0;
+  border-radius: var(--digit-radius) var(--digit-radius) 0 0;
+  transform-origin: bottom center;
+  animation: flipTop 0.3s ease-in forwards;
+}
+
+.flip-digit__bottom-flip {
+  bottom: 0;
+  border-radius: 0 0 var(--digit-radius) var(--digit-radius);
+  border-top: 1px solid var(--digit-divider);
+  transform-origin: top center;
+  animation: flipBottom 0.3s ease-out forwards;
+}
+
+@keyframes flipTop {
+  0% {
+    transform: rotateX(0deg);
+  }
+
+  100% {
+    transform: rotateX(-90deg);
+  }
+}
+
+@keyframes flipBottom {
+  0% {
+    transform: rotateX(90deg);
+  }
+
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+.flip-clock__sep {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.35em;
+  font-size: var(--digit-fs);
+  font-weight: 700;
+  color: var(--blog-text-secondary, #8892a4);
+  line-height: var(--digit-h);
+  user-select: none;
+}
+
+.flip-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  direction: ltr;
+}
+
+:root.dark .flip-digit {
+  --digit-bg: #0d0f17;
+  --digit-color: #e0e6f0;
+  --digit-divider: rgba(0, 0, 0, 0.6);
+  --digit-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+}

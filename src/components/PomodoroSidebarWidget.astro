@@ -1,42 +1,33 @@
 ---
 import '../styles/pomodoro-tokens.css';
+import '../styles/flip-digit.css';
+import '../styles/pomodoro-widget.css';
+import PomodoroSidebarTimer from './PomodoroSidebarTimer';
 ---
 
-<a class="pomodoro-sidebar-card" href="/pomodoro" aria-label="打开番茄钟完整页面" data-pagefind-ignore>
+<div class="pomodoro-sidebar-card" data-pagefind-ignore>
   <div class="pomodoro-sidebar-card__glass" aria-hidden="true">
     <span></span>
     <span></span>
     <span></span>
   </div>
-  <div>
-    <span class="pomodoro-sidebar-card__eyebrow">Focus timer</span>
-    <h3>番茄钟</h3>
-    <p>25 分钟专注，休息时自动切换。点击进入完整面板。</p>
-  </div>
-  <span class="pomodoro-sidebar-card__cta">开始专注</span>
-</a>
+  <PomodoroSidebarTimer client:load />
+</div>
 
 <style>
   .pomodoro-sidebar-card {
     position: relative;
-    display: grid;
-    gap: 14px;
     overflow: hidden;
-    padding: 18px;
-    color: var(--blog-text-primary);
     background:
       linear-gradient(160deg, var(--pomodoro-rain-glass-fill-strong), var(--pomodoro-rain-glass-fill)),
       url('/pomodoro-bg/bg.png') center / cover no-repeat;
     border: 1px solid var(--pomodoro-rain-glass-border);
     border-radius: var(--blog-radius-lg);
     box-shadow: var(--blog-shadow-md), inset 0 1px 0 var(--pomodoro-rain-glass-rim);
-    text-decoration: none;
     transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   }
 
   .pomodoro-sidebar-card:hover {
-    color: var(--blog-text-primary);
-    transform: translateY(-2px);
     border-color: var(--blog-accent);
     box-shadow: var(--blog-shadow-hover);
   }
@@ -97,39 +88,5 @@ import '../styles/pomodoro-tokens.css';
   .pomodoro-sidebar-card > :not(.pomodoro-sidebar-card__glass) {
     position: relative;
     z-index: 1;
-  }
-
-  .pomodoro-sidebar-card__eyebrow {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--blog-text-tertiary);
-    font-family: var(--blog-font-mono);
-    font-size: 0.7rem;
-    line-height: 1.4;
-    text-transform: uppercase;
-  }
-
-  .pomodoro-sidebar-card h3 {
-    margin: 0 0 8px;
-    color: var(--blog-text-primary);
-    font-size: 1rem;
-    line-height: 1.35;
-  }
-
-  .pomodoro-sidebar-card p {
-    margin: 0;
-    color: var(--blog-text-secondary);
-    font-size: 0.78rem;
-    line-height: 1.7;
-  }
-
-  .pomodoro-sidebar-card__cta {
-    width: fit-content;
-    padding: 7px 11px;
-    color: var(--blog-surface);
-    background: var(--blog-accent);
-    border-radius: var(--blog-radius-sm);
-    font-size: 0.78rem;
-    line-height: 1.2;
   }
 </style>
