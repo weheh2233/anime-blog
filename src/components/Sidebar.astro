@@ -1,4 +1,4 @@
----
+﻿---
 import { SITE } from '../consts';
 import { Image } from 'astro:assets';
 import { getCollection } from 'astro:content';
@@ -45,6 +45,24 @@ const recentPosts = allPosts.slice(0, 4);
 
   <PomodoroSidebarWidget />
 
+  <section class="music-card card" id="music-sidebar-card" aria-labelledby="music-sidebar-title">
+    <div class="music-card__eyebrow">Local music</div>
+    <div class="music-card__main">
+      <img id="music-sidebar-cover" class="music-card__cover" alt="" />
+      <div class="music-card__details">
+        <h3 id="music-sidebar-title">本地音乐</h3>
+        <p id="music-sidebar-artist">正在加载</p>
+        <span id="music-sidebar-album">本地音乐</span>
+      </div>
+    </div>
+    <div class="music-card__controls">
+      <button id="music-sidebar-prev" type="button" aria-label="上一首">上一首</button>
+      <button id="music-sidebar-toggle" class="music-card__play" type="button" aria-label="播放音乐">播放</button>
+      <button id="music-sidebar-next" type="button" aria-label="下一首">下一首</button>
+    </div>
+    <p id="music-sidebar-status" class="music-card__status" role="status">正在准备音乐</p>
+  </section>
+
   <div class="card p-4" style="background: var(--blog-surface); border: 1px solid var(--blog-border); border-radius: var(--blog-radius-lg);">
     <h3 class="text-sm font-medium mb-3" style="color: var(--blog-text-primary);">Gallery</h3>
     <div class="grid grid-cols-3 gap-2">
@@ -88,7 +106,133 @@ const recentPosts = allPosts.slice(0, 4);
   </div>
 </div>
 
+<style>
+  .music-card {
+    padding: 18px;
+    background: var(--blog-surface);
+    border: 1px solid var(--blog-border);
+    border-radius: var(--blog-radius-lg);
+  }
+
+  .music-card__eyebrow {
+    margin-bottom: 13px;
+    color: var(--blog-text-tertiary);
+    font-family: var(--blog-font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .music-card__main {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+  }
+
+  .music-card__cover {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    object-fit: cover;
+    background: var(--blog-accent-light);
+    box-shadow: var(--blog-shadow-sm);
+  }
+
+  .music-card__details { min-width: 0; }
+  .music-card__details h3,
+  .music-card__details p,
+  .music-card__details span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .music-card__details h3 { margin: 0 0 5px; color: var(--blog-text-primary); font-size: 0.9rem; font-weight: 600; }
+  .music-card__details p { margin: 0 0 4px; color: var(--blog-text-secondary); font-size: 0.75rem; }
+  .music-card__details span { display: block; color: var(--blog-text-tertiary); font-size: 0.68rem; }
+
+  .music-card__controls {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr 1fr;
+    gap: 6px;
+    margin-top: 16px;
+  }
+
+  .music-card__controls button {
+    min-height: 30px;
+    padding: 0 6px;
+    color: var(--blog-text-secondary);
+    background: var(--blog-accent-lighter);
+    border: 0;
+    border-radius: var(--blog-radius-sm);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.68rem;
+    transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+  }
+
+  .music-card__controls button:hover {
+    color: var(--blog-text-primary);
+    background: var(--blog-accent-light);
+    transform: translateY(-1px);
+  }
+
+  .music-card__controls .music-card__play {
+    color: var(--blog-surface);
+    background: var(--blog-accent);
+    font-weight: 600;
+  }
+
+  .music-card__status {
+    min-height: 1.25em;
+    margin: 11px 0 0;
+    color: var(--blog-text-tertiary);
+    font-size: 0.68rem;
+    line-height: 1.5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .music-card__controls button { transition: none; }
+  }
+</style>
+
 <script>
+  (() => {
+    const cover = document.getElementById('music-sidebar-cover');
+    const title = document.getElementById('music-sidebar-title');
+    const artist = document.getElementById('music-sidebar-artist');
+    const album = document.getElementById('music-sidebar-album');
+    const status = document.getElementById('music-sidebar-status');
+    const toggleButton = document.getElementById('music-sidebar-toggle');
+    const previousButton = document.getElementById('music-sidebar-prev');
+    const nextButton = document.getElementById('music-sidebar-next');
+    if (!cover || !title || !artist || !album || !status || !toggleButton || !previousButton || !nextButton) return;
+
+    const bind = () => {
+      const controller = window.__musicPlayer;
+      if (!controller) {
+        window.setTimeout(bind, 120);
+        return;
+      }
+
+      controller.subscribe((state) => {
+        const track = state.currentTrack;
+        cover.src = track?.cover || '';
+        cover.alt = track ? `${track.name} cover` : '';
+        title.textContent = track?.name || (state.status === 'error' ? 'Music unavailable' : 'Local music');
+        artist.textContent = track?.artists.join(' / ') || state.error || 'Loading';
+        album.textContent = track?.album || 'Local music';
+        toggleButton.textContent = state.status === 'playing' ? 'Pause' : 'Play';
+        toggleButton.setAttribute('aria-label', state.status === 'playing' ? 'Pause music' : 'Play music');
+        status.textContent = state.status === 'error' || state.status === 'blocked'
+          ? (state.error || 'Click play to start music')
+          : state.status === 'loading' ? 'Preparing music' : 'Local music';
+      });
+
+      toggleButton.addEventListener('click', () => void controller.toggle());
+      previousButton.addEventListener('click', () => void controller.previous());
+      nextButton.addEventListener('click', () => void controller.next());
+    };
+
+    bind();
+  })();
+
   const locEl = document.getElementById('sidebar-location');
   if (locEl) {
     try {
@@ -106,3 +250,5 @@ const recentPosts = allPosts.slice(0, 4);
     }
   }
 </script>
+
+

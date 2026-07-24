@@ -6,8 +6,11 @@ import Sidebar from '../components/Sidebar.astro';
 import SplashScreen from '../components/SplashScreen.astro';
 import SearchModal from '../components/SearchModal.astro';
 import MouseTrail from '../components/MouseTrail.astro';
+import GlobalPomodoroNotifier from '../components/GlobalPomodoroNotifier';
+import LocalMusicRuntime from '../components/LocalMusicRuntime.astro';
 import { SITE } from '../consts';
 import fs from 'node:fs';
+import { ClientRouter } from 'astro:transitions';
 
 // 背景图随机池 — 往 src/assets/bg/ 丢图即可自动加入
 const bgPool = Object.values(
@@ -52,6 +55,7 @@ const { title, description, hideSidebar, showToc } = Astro.props;
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <ClientRouter />
     <title>{title} | {SITE.title}</title>
     <meta name="astro-view-transitions-enabled" content="true" />
 
@@ -76,9 +80,11 @@ const { title, description, hideSidebar, showToc } = Astro.props;
     </script>
   </head>
   <body>
+    <LocalMusicRuntime />
     <SplashScreen />
     <SearchModal />
     <MouseTrail />
+    <GlobalPomodoroNotifier client:load />
     <Header />
 
     <!-- 主内容区 -->

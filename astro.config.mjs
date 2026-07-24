@@ -9,8 +9,11 @@ import path from 'node:path';
 export default defineConfig({
   site: 'https://anime-blog.vercel.app',
 
-  output: 'static',
+  output: 'server',
   adapter: vercel(),
+  devToolbar: {
+    enabled: false,
+  },
 
   vite: {
     plugins: [

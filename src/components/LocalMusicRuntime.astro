@@ -1,0 +1,113 @@
+---
+import { LOCAL_MUSIC } from '../lib/localMusic';
+---
+
+<audio id="global-music-audio" preload="metadata" aria-hidden="true" transition:persist></audio>
+
+<script define:vars={{ tracks: LOCAL_MUSIC }}>
+  const bootLocalMusic = () => {
+    if (window.__musicPlayer) return;
+    const audio = document.getElementById('global-music-audio');
+    if (!audio) return;
+
+    let state = {
+      tracks,
+      currentIndex: tracks.length ? 0 : -1,
+      currentTrack: tracks[0] || null,
+      status: tracks.length ? 'ready' : 'error',
+      error: tracks.length ? null : 'No local music is configured',
+    };
+    const listeners = new Set();
+
+    const emit = () => {
+      window.dispatchEvent(new CustomEvent('music:state-change', { detail: state }));
+      listeners.forEach((listener) => listener(state));
+    };
+
+    const setState = (patch) => {
+      state = { ...state, ...patch };
+      emit();
+    };
+
+    const setTrack = (index) => {
+      if (!state.tracks.length) return;
+      const currentIndex = (index + state.tracks.length) % state.tracks.length;
+      const currentTrack = state.tracks[currentIndex];
+      audio.src = currentTrack.url;
+      setState({ currentIndex, currentTrack, status: 'ready', error: null });
+    };
+
+    const play = async () => {
+      if (!state.currentTrack) {
+        setState({ status: 'error', error: 'No local music is configured' });
+        return;
+      }
+
+      if (!audio.src) audio.src = state.currentTrack.url;
+      try {
+        await audio.play();
+        setState({ status: 'playing', error: null });
+      } catch {
+        setState({ status: 'blocked', error: 'Playback was blocked. Click play to start.' });
+      }
+    };
+
+    const pause = () => {
+      audio.pause();
+      setState({ status: 'paused' });
+    };
+
+    const next = async () => {
+      setTrack(state.currentIndex + 1);
+      await play();
+    };
+
+    const previous = async () => {
+      setTrack(state.currentIndex - 1);
+      await play();
+    };
+
+    audio.addEventListener('play', () => setState({ status: 'playing', error: null }));
+    audio.addEventListener('pause', () => {
+      if (!audio.ended) setState({ status: 'paused' });
+    });
+    audio.addEventListener('ended', () => { void next(); });
+    audio.addEventListener('error', () => {
+      setState({ status: 'error', error: 'This audio file could not be played.' });
+    });
+
+    window.__musicPlayer = {
+      getState: () => state,
+      play,
+      pause,
+      toggle: async () => (state.status === 'playing' ? pause() : play()),
+      next,
+      previous,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        listener(state);
+        return () => listeners.delete(listener);
+      },
+    };
+
+    emit();
+  };
+
+  bootLocalMusic();
+  document.addEventListener('astro:page-load', bootLocalMusic);
+
+  // Splash animation: 5000ms, then 500ms fade-out.
+  window.setTimeout(() => {
+    if (window.__musicPlayer) void window.__musicPlayer.play();
+  }, 5500);
+</script>
+
+<style>
+  #global-music-audio {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+</style>
