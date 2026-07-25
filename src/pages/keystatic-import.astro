@@ -1,7 +1,10 @@
 ---
-export const prerender = true;
-
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { hasKeystaticRepositoryAccess } from '../lib/keystaticAuth';
+
+if (!(await hasKeystaticRepositoryAccess(Astro.request))) {
+  return Astro.redirect('/keystatic');
+}
 ---
 
 <BaseLayout title="导入文章" description="导入 Markdown 草稿" hideSidebar>
@@ -192,7 +195,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
     const body = new FormData();
     body.set('article', articleInput.files[0]);
-    body.set('secret', document.getElementById('secret-input').value);
     appendIfFilled(body, 'title', titleInput.value);
     appendIfFilled(body, 'description', descriptionInput.value);
     appendIfFilled(body, 'author', authorInput.value);
@@ -404,6 +406,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 </script>
 
 <style>
+  [data-import-page] label:has(#secret-input) {
+    display: none;
+  }
+
   .import-shell {
     width: min(1120px, calc(100vw - 32px));
     margin: 0 auto;

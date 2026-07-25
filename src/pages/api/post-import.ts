@@ -5,13 +5,14 @@ import {
   preparePostImport,
   type UploadedAsset,
 } from '../../lib/postImport';
+import { hasKeystaticRepositoryAccess } from '../../lib/keystaticAuth';
 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request }) => {
   try {
     const form = await request.formData();
-    assertSecret(form.get('secret'));
+    await assertImportAccess(request, form.get('secret'));
 
     const article = form.get('article');
     if (!(article instanceof File)) {
@@ -63,6 +64,19 @@ async function fileToAsset(file: File): Promise<UploadedAsset> {
     data: new Uint8Array(await file.arrayBuffer()),
     type: file.type,
   };
+}
+
+async function assertImportAccess(request: Request, value: FormDataEntryValue | null) {
+  if (process.env.NODE_ENV === 'production') {
+    if (!(await hasKeystaticRepositoryAccess(request))) {
+      const error = new Error('请先登录有仓库写入权限的 Keystatic 账号。');
+      (error as Error & { status?: number }).status = 401;
+      throw error;
+    }
+    return;
+  }
+
+  assertSecret(value);
 }
 
 function assertSecret(value: FormDataEntryValue | null) {
