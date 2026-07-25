@@ -15,25 +15,25 @@ draft: true
 
 先拆解 RAG 的三个核心模块，分别搞透：
 
-文档处理 & 分块（Chunking）
+**文档处理 & 分块（Chunking）**
 
 - 不同分块策略：固定大小、语义分块、递归分块、基于文档结构
 - 关键权衡：块大小 × 重叠窗口 — 影响检索精度和上下文利用率
 - Metadata 附加策略
 
-向量化（Embedding）
+**向量化（Embedding）**
 
 - Embedding 模型选型：text-embedding-3-small/large, bge-m3, e5-mistral, jina-embeddings 等
 - 多语言/跨语言 embedding
 - 维度选择与性能关系（降维、Matryoshka embedding）
 - 看看 MTEB leaderboard 理解模型排名
 
-检索与排序
+**检索与排序**
 
 - 向量检索（ANN, HNSW, IVF）
 - 混合检索（BM25 + 向量），为什么几乎是标配
 - Reranker（cross-encoder），理解为什么 rerank 对质量提升巨大
-- 检索指标：Recall@k, MRR, NDCG
+- 检索指标：Recall@k, MRR, NDCG.
 
 ## 第二阶段：落地一个完整系统（2-3周）
 
@@ -187,4 +187,4 @@ draft: true
 - GitHub 上搜 "Advanced-RAG" 中文解读 repo 很多
 - 微信搜一搜 "RAG 实战" 也有一些不错的技术公众号文章
 
-建议先看 LlamaIndex 官方文档的 Understanding RAG (https://docs.llamaindex.ai/en/stable/understanding/) 章节，讲得系统且配有可运行代码。然后买个便宜的 API 边看边跑，比纯读快得多。
+**建议先看 LlamaIndex 官方文档的 Understanding RAG (https://docs.llamaindex.ai/en/stable/understanding/) 章节，讲得系统且配有可运行代码。然后买个便宜的 API 边看边跑，比纯读快得多。**
