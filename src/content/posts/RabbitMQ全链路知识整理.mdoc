@@ -52,8 +52,8 @@ draft: false
            ▼        ▼        ▼
 ┌─────────────────┐ ┌──────────────┐ ┌──────────────┐
 │ bonus.queue     │ │ notify.queue │ │ audit.queue   │
-│ BonusConsumer   │ │ NotifConsum  │ │ AuditConsumer │
-│  ↓ insert bonus │ │  ↓ insert    │ │  ↓ insert     │
+│ BonusConsumer   │ │  NotifConsum  │ │ AuditConsumer │
+│  ↓ insert bonus │ │  ↓ insert    │ │   ↓ insert     │
 │  _log (幂等)     │ │  notificatn │ │  audit_log    │
 │                 │ │  (幂等)       │ │  (幂等)        │
 └─────────────────┘ └──────────────┘ └──────────────┘
