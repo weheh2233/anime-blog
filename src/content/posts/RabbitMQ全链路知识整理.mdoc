@@ -1,0 +1,825 @@
+---
+title: RabbitMQ全链路知识整理
+description: >-
+  基于项目 mpdockerspringcloudRabbitMqEs 的实际实现总结 架构：MpStudy（发布端）→ RabbitMQ →
+  MpOrder（消费端，3个消费者并行落库）
+author: Kiro
+publishDate: 2026-07-25
+zone: 编程
+tags:
+  - Docker
+  - MybatisPlus
+  - RabbitMQ
+draft: false
+---
+# RabbitMQ 全链路可靠性知识整理
+
+> 基于项目 `mp_docker_springcloud_RabbitMq_Es` 的实际实现总结
+架构：MpStudy（发布端）→ RabbitMQ → MpOrder（消费端，3个消费者并行落库）
+
+---
+
+## 1. 架构概览
+
+```markdown
+┌─────────────────────────────────────────────────────────────────┐
+│                     MpStudy (发送端)                              │
+│                                                                  │
+│  UserService.deductBalance()                                     │
+│      │  @Transactional                                           │
+│      │  1. 扣库（SQL: update user set balance=balance-?）         │
+│      │  2. 查询最新余额                                           │
+│      │  3. 构建 OrderPaidEvent                                   │
+│      │  4. publishOrderPaidEvent(event)                          │
+│      ▼                                                           │
+│  OrderEventPublisher                                             │
+│      │  UUID → eventId (±幂等)                                   │
+│      │  CorrelationData(eventId) ±确认回调                       │
+│      │  convertAndSend(exchange, routingKey, event, cd)          │
+│      ▼                                                           │
+└──────────────────────────────────────────────────────────────────┘
+                    │
+                    │  RabbitMQ Broker
+                    │  Exchange: order.direct
+                    │  RoutingKey: order.paid.success
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │    LazyQueue          │  ← 消息强制落盘
+        │   (3个队列绑定同一RK)   │
+        └───────────────────────┘
+           │        │        │
+           ▼        ▼        ▼
+┌─────────────────┐ ┌──────────────┐ ┌──────────────┐
+│ bonus.queue     │ │ notify.queue │ │ audit.queue   │
+│ BonusConsumer   │ │ NotifConsum  │ │ AuditConsumer │
+│  ↓ insert bonus │ │  ↓ insert    │ │  ↓ insert     │
+│  _log (幂等)     │ │  notificatn │ │  audit_log    │
+│                 │ │  (幂等)       │ │  (幂等)        │
+└─────────────────┘ └──────────────┘ └──────────────┘
+```
+
+**关键角色：**
+
+{% table %}
+- 角色
+- 服务
+- 职责
+---
+- 发布者（Producer）
+- MpStudy
+- 发送支付成功事件
+---
+- 交换机（Exchange）
+- —
+- order.direct（Direct类型）
+---
+- 队列（Queue）
+- —
+- 3个 durable LazyQueue
+---
+- 消费者（Consumer）
+- MpOrder
+- 积分/通知/审计落库
+---
+- 死信队列（DLQ）
+- —
+- error.queue（重试耗尽后转入）
+{% /table %}
+
+---
+
+## 2. 发送者确认（Publisher Confirm）
+
+### 配置
+
+```yaml
+# MpStudy/application.yaml
+spring:
+  rabbitmq:
+    publisher-confirm-type: correlated   # 关键配置
+    publisher-returns: true              # 路由不可达时退回
+```
+
+- `publisher-confirm-type` 的三种选值：
+
+{% table %}
+- 值
+- 说明
+- 场景
+---
+- `none`
+- 关闭确认机制
+- 不关心消息是否到达
+---
+- `simple`
+- 同步阻塞等待 Broker 回执
+- 每条消息会阻塞发送线程
+---
+- `correlated`
+- Broker 异步回调通知 ack/nack
+- **推荐**，不影响发送性能
+{% /table %}
+
+### 代码实现
+
+```java
+public void publishOrderPaidEvent(OrderPaidEvent event) {
+    String eventId = UUID.randomUUID().toString();  // ±幂等
+    event.setEventId(eventId);
+    CorrelationData cd = new CorrelationData(eventId);
+
+    rabbitTemplate.convertAndSend(ORDER_EXCHANGE, ROUTING_KEY_SUCCESS, event, cd);
+
+    // 异步确认回调（whenComplete vs whenCompleteAsync）
+    cd.getFuture().whenComplete((confirm, ex) -> {
+        if (ex != null) {
+            log.error("确认回调异常", ex);
+        } else if (confirm.isAck()) {
+            log.debug("消息发送成功, id={}", cd.getId());
+        } else {
+            log.error("消息发送失败, id={}, reason={}", cd.getId(), confirm.getReason());
+        }
+    });
+}
+```
+
+### 回调选用原则
+
+{% table %}
+- 方式
+- 执行位置
+- 场景
+---
+- `whenComplete`
+- 当前线程/完成时立即执行
+- **日志、计数等轻量操作**
+---
+- `whenCompleteAsync`
+- 另起线程异步执行
+- 重量级操作（DB写入、RPC）
+{% /table %}
+
+> 回调里只打日志的话用 `whenComplete` 即可。Broker 的 confirm 本身已经是异步回调，不会阻塞发送。
+
+### 流程图
+
+```
+发送 → Broker 收到消息
+           │
+      ┌────┴────┐
+      │ 路由成功  │
+      └────┬────┘
+           │
+      ┌────┴────────┐
+      │ 持久化到磁盘 │
+      └────┬────────┘
+           │
+      ┌────┴────┐
+      │ 回调 ack │  →  confirm.isAck() = true
+      └─────────┘
+      
+      ┌────────────┐
+      │ 路由失败    │  → 触发 ReturnsCallback
+      └────────────┘
+      
+      ┌─────────────┐
+      │ Broker 异常 │  → 回调 nack + reason
+      └─────────────┘
+```
+
+---
+
+## 3. 发送者重试（Publisher Retry）
+
+### 配置
+
+```yaml
+# MpStudy/application.yaml
+spring:
+  rabbitmq:
+    template:
+      retry:
+        enabled: true           # 发送失败自动重试
+        initial-interval: 1000  # 首次间隔 1s
+        max-attempts: 3         # 最多 3 次（含首次）
+        multiplier: 2           # 指数退避：1s → 2s → 4s
+```
+
+### 触发条件
+
+- RabbitMQ Broker 不可达（网络故障、服务宕机）
+- 连接超时（`connection-timeout: 3s`）
+- **不会触发**的场景：消息已到达 Broker 但路由失败 → 那是 ReturnsCallback 的职责
+
+### 与 Confirm 的关系
+
+```
+发送 → connect 超时/拒绝
+   │  template.retry 重试 3 次
+   │  重试耗尽 → 抛 AmqpException
+   ▼
+   @Transactional 回滚扣款
+   （不会出现钱扣了消息没到的情况）
+```
+
+### 事务一致性权衡（重要决策）
+
+**当前做法：不吞 MQ 异常，让事务回滚。**
+
+```
+try { deductBalance(...); } catch (Exception e) { ... }    ← ❌ 旧代码，吞了异常
+deductBalance(...) 无 try-catch                            ← ✅ 新代码，抛到事务
+```
+
+{% table %}
+- 方案
+- 优点
+- 缺点
+- 是否采用
+---
+- **直接抛异常回滚事务**
+- 简单可靠，不会出现数据裂痕
+- 偶发网络抖动也回滚
+- 当前方案
+---
+- **Outbox 模式**
+- 绝对一致，MQ 宕机不影响事务
+- 额外表 + 轮询任务，架构重
+- ✅新采用
+{% /table %}
+
+> 核心原则：**宁可不发，不能发了但用户觉得没发。** 用户看到报错可以重新支付，但钱扣了事件没丢是数据裂痕。
+
+---
+
+## 4. 退回机制（Publisher Returns）
+
+### 配置
+
+```yaml
+publisher-returns: true   # 路由不可达时退回消息
+```
+
+### 代码实现
+
+```java
+// 必须在 RabbitTemplate 上设置 mandatory=true
+rabbitTemplate.setMandatory(true);
+
+rabbitTemplate.setReturnsCallback(returned -> {
+    log.warn("消息被退回: exchange={}, routingKey={}, replyText={}, body={}",
+            returned.getExchange(), returned.getRoutingKey(),
+            returned.getReplyText(), new String(returned.getMessage().getBody()));
+});
+```
+
+### 触发场景
+
+{% table %}
+- 场景
+- Broker 表现
+- 收到哪种回调
+---
+- 消息到达 queue
+- —
+- ack + 无 Returns
+---
+- 消息到 exchange 但无绑定队列
+- ReturnsCallback 触发
+- nack + Returns
+---
+- 消息 exchange 不存在
+- channel 级异常
+- nack
+{% /table %}
+
+### 监听方案对比
+
+{% table %}
+- 方式
+- 说明
+---
+- `ReturnsCallback`
+- Spring AMQP 2.0+ 推荐（本项目使用）
+---
+- `setReturnCallback`
+- 旧版 API，已废弃
+{% /table %}
+
+---
+
+## 5. 消费者确认（Consumer Acknowledge）
+
+### 配置
+
+```yaml
+# MpOrder/application.yaml
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        acknowledge-mode: auto    # Spring 自动确认
+        prefetch: 1               # 每次取1条，公平分发
+```
+
+### 确认模式对比
+
+{% table %}
+- 模式
+- 含义
+- 使用场景
+---
+- `none`
+- 自动确认，消息投出即确认
+- 可接受丢消息（不推荐）
+---
+- `auto`
+- 监听器无异常返回 → ack；抛异常 → nack
+- **推荐，与重试机制配合**
+---
+- `manual`
+- 手动调用 channel.basicAck/Nack
+- 需要精细控制确认时机
+{% /table %}
+
+### auto 模式的行为
+
+```
+消费者收到消息
+    │
+    ├─ 正常返回 → Broker 确认删除
+    │
+    └─ 抛异常 → 触发重试机制
+         │
+         ├─ 重试内成功 → ack
+         │
+         └─ 重试耗尽 → RepublishMessageRecoverer 接手
+```
+
+### prefetch=1
+
+- 每次只取 1 条消息，处理完才取下一条
+- 效果：**公平分发**（Fair Dispatch），防止某个消费者积压太多未确认消息
+
+---
+
+## 6. 消费者重试（Consumer Retry）
+
+### 配置
+
+```yaml
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        retry:
+          enabled: true           # 消费失败自动重试
+          initial-interval: 1000  # 首次 1s
+          max-attempts: 3         # 最多 3 次
+          multiplier: 2           # 1s → 2s → 4s
+```
+
+### 重试流程
+
+```
+消费者抛异常
+    │
+    ├─ 第1次重试（1s后）
+    │    └─ 成功 → ack，结束
+    │
+    ├─ 第2次重试（2s后）
+    │    └─ 成功 → ack，结束
+    │
+    ├─ 第3次重试（4s后）
+    │    └─ 成功 → ack，结束
+    │
+    └─ 重试耗尽
+         └─ MessageRecoverer.recover()
+              └─ RepublishMessageRecoverer
+                   → 转发到 error.queue
+```
+
+### 重试是 Spring 层面模拟的，不会触发 Broker 级别重新投递
+
+```
+❌ 误解：抛出异常 → Broker 重新投递给消费者
+✅ 正确：抛出异常 → Spring 内部重试拦截器重新调用监听器方法
+          重试耗尽 → 调用 MessageRecoverer
+          消费者返回 ack（消息从队列删除，已转到 error.queue）
+```
+
+### 自动装配机制
+
+```
+yaml: listener.simple.retry.enabled=true
+    │
+    ▼
+Spring Boot 自动配置 → 创建 RetryOperationsInterceptor
+    │
+    ▼
+扫描上下文中的 MessageRecoverer Bean
+    │
+    ▼
+找到 RepublishMessageRecoverer → 设为 recoveryCallback
+    │
+    ▼
+重试耗尽 → 自动调用 recoveryCallback.recover()
+```
+
+---
+
+## 7. 死信队列（DLQ / RepublishMessageRecoverer）
+
+### 配置
+
+```java
+@Bean
+public MessageRecoverer republishMessageRecoverer(RabbitTemplate rabbitTemplate) {
+    return new RepublishMessageRecoverer(rabbitTemplate, ERROR_DIRECT, "error");
+}
+```
+
+### 交换机和队列定义
+
+```java
+public static final String ERROR_DIRECT = "error.direct";
+
+@Bean
+public Queue errorQueue() {
+    return QueueBuilder.durable("error.queue").lazy().build();
+}
+
+@Bean
+public DirectExchange errorExchange() {
+    return new DirectExchange(ERROR_DIRECT);
+}
+
+@Bean
+public Binding errorBinding() {
+    return BindingBuilder.bind(errorQueue()).to(errorExchange()).with("error");
+}
+```
+
+### 重试耗尽后的消息内容
+
+重试 3 次后自动转发到 `error.queue`，消息 headers 中携带：
+
+{% table %}
+- Header
+- 内容
+---
+- `x-original-exchange`
+- 原始 exchange
+---
+- `x-original-routingKey`
+- 原始 routingKey
+---
+- `x-exception-message`
+- 异常信息
+---
+- `x-exception-stacktrace`
+- 完整堆栈
+{% /table %}
+
+### ErrorConsumer 处理方案
+
+```java
+@RabbitListener(queues = "error.queue")
+public void handleError(Message message) {
+    String body = new String(message.getBody());
+    String exception = message.getMessageProperties().getHeader("x-exception-message");
+    String originalExchange = message.getMessageProperties().getHeader("x-original-exchange");
+
+    // 告警通知（企业微信 / 邮件 / 钉钉）
+    // alertService.sendAlert(...)
+
+    // 兜底策略可选：
+    // a) 自动重放回原队列
+    // b) 存数据库，事后人工分析
+    // c) 自动 ack 丢弃（确认已处理）
+}
+```
+
+---
+
+## 8. 幂等性（Idempotency）
+
+### 设计思路
+
+**以数据库唯一约束为核心，不引入额外组件。**
+
+```java
+// 发送端：生成 UUID 作为 eventId
+String eventId = UUID.randomUUID().toString();
+event.setEventId(eventId);
+
+// 消费端：业务表 event_id 加 UNIQUE KEY
+// insert 遇到重复 → 抛出 DuplicateKeyException → catch 跳过
+try {
+    baseMapper.insert(logEntry);
+} catch (DuplicateKeyException e) {
+    log.debug("重复 eventId={}，跳过", event.getEventId());
+}
+```
+
+### 为什么不选其他方案
+
+{% table %}
+- 方案
+- 本项目选择
+- 原因
+---
+- **DB 唯一约束**
+- ✅ 采用
+- 简单可靠，0 额外组件
+---
+- 独立去重表
+- ❌ 不采用
+- 多一张表，管理成本
+---
+- Redis 分布式锁
+- ❌ 不采用
+- 引入新依赖不值
+---
+- 业务键查询先判断
+- ❌ 不采用
+- 多一次查询，无意义
+{% /table %}
+
+### 幂等设计要点
+
+1. **eventId 必须在发送端生成**，不是消费者生成（否则重试消息的 eventId 不一致）
+1. **发送端必须在业务事务内生成 eventId**，保证一次业务操作对应唯一 eventId
+1. **INSERT 必须是单条**，不能是批量（批量 INSERT 遇到重复可能部分成功部分失败）
+1. **必须是 try-catch DuplicateKeyException**，不等同于忽略（要确认是重复而不是别的异常）
+
+### 涉及表结构
+
+```sql
+CREATE TABLE bonus_log (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id     BIGINT       NOT NULL,
+    amount      INT          NOT NULL,
+    event_id    VARCHAR(36)  NOT NULL,
+    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_event_id (event_id)    -- ← 幂等保证
+);
+
+-- notification / audit_log 同理
+```
+
+### 重试 + 幂等的工作流
+
+```
+发送端发消息 (eventId=A)
+    │
+消费者收到 (eventId=A)
+    │
+    ├─ insert 成功 → 正常处理
+    │
+    └─ insert DuplicateKeyException
+         │
+         └─ 已处理过，直接跳过（幂等）
+```
+
+---
+
+## 9. LazyQueue（消息持久化）
+
+### 配置
+
+```java
+@Bean
+public Queue bonusQueue() {
+    return QueueBuilder.durable("order.paid.bonus.queue")
+            .lazy()     // ← LazyQueue：消息直接落盘
+            .build();
+}
+```
+
+### LazyQueue 与传统队列对比
+
+{% table %}
+- 特性
+- 传统队列
+- LazyQueue
+---
+- 存储策略
+- 尽量放内存，内存不够再写磁盘
+- 消息一来直接写磁盘
+---
+- 内存占用
+- 高（常驻内存）
+- 低（仅缓存热点）
+---
+- 吞吐量
+- 高
+- 稍低
+---
+- 可靠性
+- Broker 宕机可能丢内存中未持久化的消息
+- **高**，消息全落盘
+---
+- 适用场景
+- 高吞吐、可接受少量丢失
+- **不能丢消息的场景**
+{% /table %}
+
+### 本项目使用 LazyQueue 的理由
+
+```
+支付事件"绝对不能丢"
+    → 消息直接落盘，Broker 重启也不会丢
+    → 消费者处理速度跟不上时，磁盘能扛住积压
+```
+
+---
+
+## 10. 整体流程串联（从发起到结束）
+
+```
+[1] 用户支付
+    │
+[2] deductBalance(@Transactional)
+    │  ├─ 扣库（update set balance=balance-?）
+    │  ├─ 查最新余额
+    │  └─ 构建 OrderPaidEvent
+    │
+[3] OrderEventPublisher.publishOrderPaidEvent()
+    │  ├─ UUID → eventId
+    │  ├─ CorrelationData(eventId)
+    │  └─ convertAndSend()
+    │       │
+    │       ├─ template.retry 重试（最多3次）
+    │       │    └─ 失败 → 抛 AmqpException → 事务回滚扣款
+    │       │
+    │       └─ 发送成功
+    │            ├─ ConfirmCallback → ack/nack（仅日志，不做事后操作）
+    │            └─ ReturnsCallback → 路由失败时告警
+    │
+[4] RabbitMQ Broker
+    │  ├─ LazyQueue 持久化
+    │  └─ 分发到 3 个绑定队列
+    │
+[5] 消费者（并行）
+    │  ├─ BonusConsumer.handleOrderPaid()
+    │  ├─ NotificationConsumer.handleOrderPaid()
+    │  └─ AuditLogConsumer.handleOrderPaid()
+    │       │
+    │       ├─ 正常 → insert 业务表（unique check 幂等）
+    │       ├─ 重复 → DuplicateKeyException catch 跳过
+    │       └─ 失败
+    │            ├─ 第1次重试（1s后）
+    │            ├─ 第2次重试（2s后）
+    │            ├─ 第3次重试（4s后）
+    │            └─ 重试耗尽 → RepublishMessageRecoverer
+    │                 → error.queue
+    │                    └─ ErrorConsumer 告警/兜底
+    │
+[6] 用户可通过 GET /bonus-logs?userId=X 查看积分记录
+```
+
+---
+
+## 11. 配置速查
+
+### MpStudy（发送端）
+
+```yaml
+spring:
+  rabbitmq:
+    connection-timeout: 3s
+    template:
+      retry:
+        enabled: true
+        initial-interval: 1000
+        max-attempts: 3
+        multiplier: 2
+    publisher-confirm-type: correlated
+    publisher-returns: true
+```
+
+### MpOrder（消费端）
+
+```yaml
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        prefetch: 1
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+          multiplier: 2
+        acknowledge-mode: auto
+```
+
+### 交换机和队列定义
+
+{% table %}
+- 名称
+- 类型
+- 用途
+---
+- `order.direct`
+- Direct
+- 支付事件交换机
+---
+- `order.paid.bonus.queue`
+- LazyQueue
+- 积分队列
+---
+- `order.paid.notification.queue`
+- LazyQueue
+- 通知队列
+---
+- `order.paid.audit.queue`
+- LazyQueue
+- 审计队列
+---
+- `error.direct`
+- Direct
+- 死信交换机
+---
+- `error.queue`
+- LazyQueue
+- 死信队列
+{% /table %}
+
+---
+
+## 12. 常见问题
+
+### Q1: 消费者 auto ack 情况下，抛出异常怎么不会导致消息无限重试？
+
+因为 Spring 的 `RetryOperationsInterceptor` 在重试耗尽后调用 `MessageRecoverer.recover()`，然后**消费者返回 ack**，消息从队列删除，转移到 error.queue。所以不会无限重试。
+
+### Q2: publisher-confirm 和 publisher-returns 的区别？
+
+{% table %}
+- 机制
+- 监听时机
+- 触发条件
+---
+- Confirm
+- Broker 处理完消息后
+- 消息到达 exchange（不管能否路由到 queue）
+---
+- Returns
+- 消息路由到 queue 失败时
+- exchange 存在但没有绑定的队列
+{% /table %}
+
+### Q3: 为什么不使用 Outbox 模式？
+
+Outbox 模式（本地事务写 outbox 表 + 定时任务轮询发送）虽然能保证「本地事务和发消息绝对一致」，但要额外建表、引入轮询任务、消息有发送延迟。当前场景中，MQ 发送失败的概率很低，让事务回滚让用户重试即可。**架构的简单性也是可靠性的一部分。**
+
+### Q4: 幂等靠数据库唯一约束，会不会出现并发问题？
+
+MySQL InnoDB 的唯一约束在 MVCC 下天然是行级锁保护的。两个线程插入相同 event_id，只有一个能成功，另一个立即收到 `DuplicateKeyException` — 不需要应用层额外加锁。
+
+---
+
+## 13. 关键代码索引
+
+{% table %}
+- 文件
+- 内容
+---
+- `MpStudy/.../config/RabbitConfig.java`
+- 发布端：设置 mandatory + ReturnsCallback
+---
+- `MpStudy/.../mq/OrderEventPublisher.java`
+- 发布端：confirm 回调 + 发送逻辑
+---
+- `MpStudy/.../service/impl/UserServiceImpl.java`
+- 发送端：事务内扣款 + 发消息
+---
+- `MpOrder/.../config/RabbitConfig.java`
+- 消费端：交换机/队列/绑定定义
+---
+- `MpOrder/.../config/ErrorMessageConfig.java`
+- 消费端：DLQ + RepublishMessageRecoverer
+---
+- `MpOrder/.../mq/BonusConsumer.java`
+- 积分消费者
+---
+- `MpOrder/.../mq/NotificationConsumer.java`
+- 通知消费者
+---
+- `MpOrder/.../mq/AuditLogConsumer.java`
+- 审计消费者
+---
+- `MpOrder/.../mq/ErrorConsumer.java`
+- 死信消费者
+---
+- `MpOrder/.../service/impl/BonusLogServiceImpl.java`
+- 幂等 insert 实现
+---
+- `MpOrder/.../resources/schema.sql`
+- 业务表 + event_id 唯一约束
+{% /table %}
+
+> 整理于 2026-07-16

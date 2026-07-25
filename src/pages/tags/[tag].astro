@@ -34,6 +34,7 @@ const { tag, posts } = Astro.props;
         <ArticleCard
           title={post.data.title}
           description={post.data.description}
+          author={post.data.author}
           slug={post.id.replace(/\.md$/, '')}
           zone={post.data.zone}
           tags={post.data.tags}

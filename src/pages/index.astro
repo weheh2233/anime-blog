@@ -1,23 +1,41 @@
 ---
-export const prerender = true;
-
 import BaseLayout from '../layouts/BaseLayout.astro';
 import HeroSection from '../components/HeroSection.astro';
 import ZoneFilter from '../components/ZoneFilter.astro';
 import ArticleCard from '../components/ArticleCard.astro';
 import ScrollReveal from '../components/ScrollReveal.astro';
+import MemoryRecordCard from '../components/MemoryRecordCard.astro';
 import { SITE } from '../consts';
 import { getCollection } from 'astro:content';
+import fs from 'node:fs';
+import { load as loadYaml } from 'js-yaml';
+
+type MemoryRecord = {
+  title: string;
+  startDate: string | Date;
+  content?: string;
+};
 
 const allPosts = await getCollection('posts', ({ data }) => !data.draft);
 allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf());
 const posts = allPosts.slice(0, 18);
+
+let memoryRecords: MemoryRecord[] = [];
+try {
+  const rawSettings = fs.readFileSync('src/content/site/index.yaml', 'utf-8');
+  const siteSettings = loadYaml(rawSettings) as { memoryRecords?: MemoryRecord[] } | null;
+  memoryRecords = Array.isArray(siteSettings?.memoryRecords) ? siteSettings.memoryRecords : [];
+} catch (_) {
+  memoryRecords = [];
+}
 ---
 
 <BaseLayout title="首页" description={SITE.description}>
   <HeroSection title={SITE.title} subtitle="记录技术 · 分享生活" showSpiral={true}>
     {SITE.description}，在这里记录技术、分享生活、聊聊喜欢的作品。
   </HeroSection>
+
+  <MemoryRecordCard records={memoryRecords} />
 
   <!-- 专区筛选条 -->
   <div class="max-w-7xl mx-auto px-4 md:px-6 py-4">
@@ -38,6 +56,7 @@ const posts = allPosts.slice(0, 18);
             <ArticleCard
               title={post.data.title}
               description={post.data.description}
+              author={post.data.author}
               slug={post.id.replace(/\.md$/, '')}
               zone={post.data.zone}
               tags={post.data.tags}

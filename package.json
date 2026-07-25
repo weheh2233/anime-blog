@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "astro build && node scripts/prepare-pagefind.mjs && npx pagefind --site .vercel/output/static --glob \"**/blog/**/*.html\" && node scripts/copy-pagefind.mjs",
+    "sync:music": "node scripts/sync-local-music.mjs",
+    "build": "npm run sync:music && astro build && node scripts/prepare-pagefind.mjs && npx pagefind --site .vercel/output/static --glob \"**/blog/**/*.html\" && node scripts/copy-pagefind.mjs",
     "preview": "astro preview",
     "astro": "astro"
   },
@@ -16,6 +17,7 @@
     "@keystatic/astro": "^5.2.0",
     "@keystatic/core": "^0.5.51",
     "astro": "^7.1.1",
+    "js-yaml": "^4.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

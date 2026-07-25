@@ -55,6 +55,22 @@ const recentPosts = allPosts.slice(0, 4);
         <span id="music-sidebar-album">本地音乐</span>
       </div>
     </div>
+    <div class="music-card__progress">
+      <input
+        id="music-sidebar-progress"
+        class="music-card__range"
+        type="range"
+        min="0"
+        max="100"
+        value="0"
+        step="0.1"
+        aria-label="播放进度"
+      />
+      <div class="music-card__time" aria-hidden="true">
+        <span id="music-sidebar-current-time">0:00</span>
+        <span id="music-sidebar-duration">0:00</span>
+      </div>
+    </div>
     <div class="music-card__controls">
       <button id="music-sidebar-prev" type="button" aria-label="上一首">上一首</button>
       <button id="music-sidebar-toggle" class="music-card__play" type="button" aria-label="播放音乐">播放</button>
@@ -147,11 +163,139 @@ const recentPosts = allPosts.slice(0, 4);
   .music-card__details p { margin: 0 0 4px; color: var(--blog-text-secondary); font-size: 0.75rem; }
   .music-card__details span { display: block; color: var(--blog-text-tertiary); font-size: 0.68rem; }
 
+  .music-card__progress {
+    display: grid;
+    gap: 7px;
+    margin-top: 15px;
+    padding: 0 1px;
+  }
+
+  .music-card__range {
+    width: 100%;
+    height: 18px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    accent-color: var(--blog-accent);
+    cursor: pointer;
+  }
+
+  .music-card__range::-webkit-slider-runnable-track {
+    height: 5px;
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--blog-accent) 88%, white) 0%,
+      var(--blog-accent) var(--music-progress, 0%),
+      color-mix(in srgb, var(--blog-text-tertiary) 18%, transparent) var(--music-progress, 0%),
+      color-mix(in srgb, var(--blog-text-tertiary) 18%, transparent) 100%
+    );
+    border-radius: 99px;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.18),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.06);
+  }
+
+  .music-card__range::-webkit-slider-thumb {
+    width: 14px;
+    height: 14px;
+    margin-top: -4.5px;
+    appearance: none;
+    -webkit-appearance: none;
+    background:
+      radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.26) 34%, transparent 36%),
+      var(--blog-accent);
+    border: 2px solid color-mix(in srgb, var(--blog-surface) 92%, white);
+    border-radius: 999px;
+    box-shadow:
+      0 3px 9px rgba(0, 0, 0, 0.18),
+      0 0 0 4px color-mix(in srgb, var(--blog-accent) 15%, transparent);
+    opacity: 0;
+    transform: scale(0.82);
+    transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .music-card__range::-moz-range-track {
+    height: 5px;
+    background: color-mix(in srgb, var(--blog-text-tertiary) 18%, transparent);
+    border-radius: 99px;
+  }
+
+  .music-card__range::-moz-range-progress {
+    height: 5px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--blog-accent) 88%, white), var(--blog-accent));
+    border-radius: 99px;
+  }
+
+  .music-card__range::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background:
+      radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.26) 34%, transparent 36%),
+      var(--blog-accent);
+    border: 2px solid color-mix(in srgb, var(--blog-surface) 92%, white);
+    border-radius: 999px;
+    box-shadow:
+      0 3px 9px rgba(0, 0, 0, 0.18),
+      0 0 0 4px color-mix(in srgb, var(--blog-accent) 15%, transparent);
+    opacity: 0;
+    transform: scale(0.82);
+    transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .music-card:hover .music-card__range::-webkit-slider-thumb,
+  .music-card__range:focus-visible::-webkit-slider-thumb,
+  .music-card__range:active::-webkit-slider-thumb {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .music-card:hover .music-card__range::-moz-range-thumb,
+  .music-card__range:focus-visible::-moz-range-thumb,
+  .music-card__range:active::-moz-range-thumb {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .music-card__range:active::-webkit-slider-thumb {
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.22),
+      0 0 0 6px color-mix(in srgb, var(--blog-accent) 18%, transparent);
+  }
+
+  .music-card__range:active::-moz-range-thumb {
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.22),
+      0 0 0 6px color-mix(in srgb, var(--blog-accent) 18%, transparent);
+  }
+
+  .music-card__range:focus-visible {
+    outline: 0;
+    border-radius: 99px;
+  }
+
+  .music-card__range:focus-visible::-webkit-slider-runnable-track {
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.18),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.06),
+      0 0 0 3px color-mix(in srgb, var(--blog-accent) 18%, transparent);
+  }
+
+  .music-card__time {
+    display: flex;
+    justify-content: space-between;
+    color: color-mix(in srgb, var(--blog-text-tertiary) 78%, transparent);
+    font-family: var(--blog-font-mono);
+    font-size: 0.6rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
   .music-card__controls {
     display: grid;
     grid-template-columns: 1fr 1.15fr 1fr;
     gap: 6px;
-    margin-top: 16px;
+    margin-top: 13px;
   }
 
   .music-card__controls button {
@@ -194,41 +338,94 @@ const recentPosts = allPosts.slice(0, 4);
 
 <script>
   (() => {
-    const cover = document.getElementById('music-sidebar-cover');
-    const title = document.getElementById('music-sidebar-title');
-    const artist = document.getElementById('music-sidebar-artist');
-    const album = document.getElementById('music-sidebar-album');
-    const status = document.getElementById('music-sidebar-status');
-    const toggleButton = document.getElementById('music-sidebar-toggle');
-    const previousButton = document.getElementById('music-sidebar-prev');
-    const nextButton = document.getElementById('music-sidebar-next');
-    if (!cover || !title || !artist || !album || !status || !toggleButton || !previousButton || !nextButton) return;
+    const formatTime = (seconds) => {
+      if (!Number.isFinite(seconds) || seconds <= 0) return '0:00';
+      const minutes = Math.floor(seconds / 60);
+      const rest = Math.floor(seconds % 60).toString().padStart(2, '0');
+      return `${minutes}:${rest}`;
+    };
 
     const bind = () => {
+      const card = document.getElementById('music-sidebar-card');
+      if (!card) {
+        window.__musicSidebarCleanup?.();
+        return;
+      }
+      if (card.dataset.musicBound === 'true') return;
+
+      window.__musicSidebarCleanup?.();
+
+      const cover = card.querySelector('#music-sidebar-cover');
+      const title = card.querySelector('#music-sidebar-title');
+      const artist = card.querySelector('#music-sidebar-artist');
+      const album = card.querySelector('#music-sidebar-album');
+      const status = card.querySelector('#music-sidebar-status');
+      const progress = card.querySelector('#music-sidebar-progress');
+      const currentTime = card.querySelector('#music-sidebar-current-time');
+      const duration = card.querySelector('#music-sidebar-duration');
+      const toggleButton = card.querySelector('#music-sidebar-toggle');
+      const previousButton = card.querySelector('#music-sidebar-prev');
+      const nextButton = card.querySelector('#music-sidebar-next');
+      if (!cover || !title || !artist || !album || !status || !progress || !currentTime || !duration || !toggleButton || !previousButton || !nextButton) return;
+
+      card.dataset.musicBound = 'true';
+
       const controller = window.__musicPlayer;
       if (!controller) {
+        card.dataset.musicBound = 'false';
         window.setTimeout(bind, 120);
         return;
       }
 
-      controller.subscribe((state) => {
+      const render = (state) => {
         const track = state.currentTrack;
         cover.src = track?.cover || '';
         cover.alt = track ? `${track.name} cover` : '';
         title.textContent = track?.name || (state.status === 'error' ? 'Music unavailable' : 'Local music');
         artist.textContent = track?.artists.join(' / ') || state.error || 'Loading';
         album.textContent = track?.album || 'Local music';
+        const total = state.duration || track?.duration || 0;
+        const value = total > 0 ? Math.min(100, Math.max(0, (state.currentTime / total) * 100)) : 0;
+        progress.value = String(value);
+        progress.style.setProperty('--music-progress', `${value}%`);
+        progress.disabled = total <= 0;
+        currentTime.textContent = formatTime(state.currentTime);
+        duration.textContent = formatTime(total);
         toggleButton.textContent = state.status === 'playing' ? 'Pause' : 'Play';
         toggleButton.setAttribute('aria-label', state.status === 'playing' ? 'Pause music' : 'Play music');
         status.textContent = state.status === 'error' || state.status === 'blocked'
           ? (state.error || 'Click play to start music')
           : state.status === 'loading' ? 'Preparing music' : 'Local music';
-      });
+      };
 
-      toggleButton.addEventListener('click', () => void controller.toggle());
-      previousButton.addEventListener('click', () => void controller.previous());
-      nextButton.addEventListener('click', () => void controller.next());
+      const unsubscribe = controller.subscribe(render);
+      const abortController = new AbortController();
+
+      toggleButton.addEventListener('click', () => void controller.toggle(), { signal: abortController.signal });
+      previousButton.addEventListener('click', () => void controller.previous(), { signal: abortController.signal });
+      nextButton.addEventListener('click', () => void controller.next(), { signal: abortController.signal });
+      progress.addEventListener('input', () => {
+        const state = controller.getState();
+        const total = state.duration || state.currentTrack?.duration || 0;
+        if (total <= 0) return;
+        controller.seek((Number(progress.value) / 100) * total);
+      }, { signal: abortController.signal });
+
+      window.__musicSidebarCleanup = () => {
+        unsubscribe();
+        abortController.abort();
+        if (window.__musicSidebarCleanup === cleanup) {
+          window.__musicSidebarCleanup = undefined;
+        }
+      };
+      const cleanup = window.__musicSidebarCleanup;
     };
+
+    if (!window.__musicSidebarLifecycleBound) {
+      window.__musicSidebarLifecycleBound = true;
+      document.addEventListener('astro:before-swap', () => window.__musicSidebarCleanup?.());
+      document.addEventListener('astro:page-load', bind);
+    }
 
     bind();
   })();

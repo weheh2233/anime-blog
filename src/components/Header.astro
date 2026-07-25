@@ -403,56 +403,65 @@ const currentPath = Astro.url.pathname;
 
 <script>
   (() => {
-    if (window.__musicHeaderBound) return;
-    window.__musicHeaderBound = true;
+    const bindHeaderMusic = () => {
+      const root = document.getElementById('music-mini');
+      const trigger = document.getElementById('music-mini-trigger');
+      const cover = document.getElementById('music-mini-cover');
+      const title = document.getElementById('music-mini-title');
+      const artist = document.getElementById('music-mini-artist');
+      const toggleButton = document.getElementById('music-mini-toggle');
+      const previousButton = document.getElementById('music-mini-prev');
+      const nextButton = document.getElementById('music-mini-next');
+      if (!root || !trigger || !toggleButton || !previousButton || !nextButton) return;
+      if (root.dataset.musicBound === 'true') return;
+      root.dataset.musicBound = 'true';
 
-    const root = document.getElementById('music-mini');
-    const trigger = document.getElementById('music-mini-trigger');
-    const cover = document.getElementById('music-mini-cover');
-    const title = document.getElementById('music-mini-title');
-    const artist = document.getElementById('music-mini-artist');
-    const toggleButton = document.getElementById('music-mini-toggle');
-    const previousButton = document.getElementById('music-mini-prev');
-    const nextButton = document.getElementById('music-mini-next');
-    if (!root || !trigger || !toggleButton || !previousButton || !nextButton) return;
+      const render = (state) => {
+        const track = state.currentTrack;
+        root.classList.toggle('is-playing', state.status === 'playing');
+        if (cover) {
+          cover.src = track?.cover || '';
+          cover.alt = track ? `${track.name} 封面` : '';
+        }
+        if (title) title.textContent = track?.name || (state.status === 'error' ? '音乐不可用' : '每日推荐');
+        if (artist) artist.textContent = track?.artists.join(' / ') || state.error || '正在加载';
+        toggleButton.textContent = state.status === 'playing' ? 'Ⅱ' : '▶';
+        toggleButton.setAttribute('aria-label', state.status === 'playing' ? '暂停音乐' : '播放音乐');
+      };
 
-    const render = (state) => {
-      const track = state.currentTrack;
-      root.classList.toggle('is-playing', state.status === 'playing');
-      if (cover) {
-        cover.src = track?.cover || '';
-        cover.alt = track ? `${track.name} 封面` : '';
-      }
-      if (title) title.textContent = track?.name || (state.status === 'error' ? '音乐不可用' : '每日推荐');
-      if (artist) artist.textContent = track?.artists.join(' / ') || state.error || '正在加载';
-      toggleButton.textContent = state.status === 'playing' ? 'Ⅱ' : '▶';
-      toggleButton.setAttribute('aria-label', state.status === 'playing' ? '暂停音乐' : '播放音乐');
+      const bindController = () => {
+        const controller = window.__musicPlayer;
+        if (!controller) {
+          window.setTimeout(bindController, 120);
+          return;
+        }
+        controller.subscribe(render);
+        render(controller.getState());
+        toggleButton.addEventListener('click', () => void controller.toggle());
+        previousButton.addEventListener('click', () => void controller.previous());
+        nextButton.addEventListener('click', () => void controller.next());
+      };
+
+      trigger.addEventListener('click', () => {
+        const open = root.classList.toggle('is-open');
+        trigger.setAttribute('aria-expanded', String(open));
+      });
+
+      bindController();
     };
 
-    const bind = () => {
-      const controller = window.__musicPlayer;
-      if (!controller) {
-        window.setTimeout(bind, 120);
-        return;
-      }
-      controller.subscribe(render);
-      toggleButton.addEventListener('click', () => void controller.toggle());
-      previousButton.addEventListener('click', () => void controller.previous());
-      nextButton.addEventListener('click', () => void controller.next());
-    };
-
-    trigger.addEventListener('click', () => {
-      const open = root.classList.toggle('is-open');
-      trigger.setAttribute('aria-expanded', String(open));
-    });
-
-    document.addEventListener('click', (event) => {
-      if (!(event.target instanceof Node) || !root.contains(event.target)) {
+    if (!window.__musicHeaderOutsideClickBound) {
+      window.__musicHeaderOutsideClickBound = true;
+      document.addEventListener('click', (event) => {
+        const root = document.getElementById('music-mini');
+        const trigger = document.getElementById('music-mini-trigger');
+        if (!root || !trigger || !(event.target instanceof Node) || root.contains(event.target)) return;
         root.classList.remove('is-open');
         trigger.setAttribute('aria-expanded', 'false');
-      }
-    });
+      });
+    }
 
-    bind();
+    bindHeaderMusic();
+    document.addEventListener('astro:page-load', bindHeaderMusic);
   })();
 </script>

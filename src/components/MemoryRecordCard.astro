@@ -1,0 +1,447 @@
+---
+interface MemoryRecord {
+  title: string;
+  startDate: string | Date;
+  content?: string;
+}
+
+interface Props {
+  records?: MemoryRecord[];
+}
+
+const { records = [] } = Astro.props;
+const normalizedRecords = records
+  .map((record) => {
+    const startDate = record.startDate instanceof Date
+      ? record.startDate.toISOString().slice(0, 10)
+      : String(record.startDate || '').slice(0, 10);
+
+    return {
+      title: String(record.title || '').trim(),
+      startDate,
+      content: String(record.content || '').trim(),
+    };
+  })
+  .filter((record) => record.title && record.startDate);
+
+const firstRecord = normalizedRecords[0];
+const hasMultipleRecords = normalizedRecords.length > 1;
+---
+
+<section class="memory-record-section" data-pagefind-ignore>
+  <div class="memory-record-wrap">
+    {firstRecord ? (
+      <article
+        class="memory-record-card"
+        data-records={JSON.stringify(normalizedRecords)}
+        aria-labelledby="memory-record-title"
+      >
+        <button
+          class="memory-record-nav memory-record-nav--prev"
+          type="button"
+          data-memory-prev
+          aria-label="上一条相遇记录"
+          disabled={!hasMultipleRecords}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
+
+        <div class="memory-record-stage" aria-live="polite">
+          <div class="memory-record-panel" data-memory-panel>
+            <div class="memory-record-meta">
+              <span class="memory-record-eyebrow">相遇记录</span>
+              <time data-memory-date datetime={firstRecord.startDate}>{firstRecord.startDate}</time>
+            </div>
+
+            <div class="memory-record-main">
+              <div class="memory-record-copy">
+                <h2 id="memory-record-title" data-memory-title>{firstRecord.title}</h2>
+                <p data-memory-content>{firstRecord.content || '这一天被记录下来，于是它还在继续发光。'}</p>
+              </div>
+
+              <div class="memory-record-days" aria-label="已经相遇的天数">
+                <strong data-memory-days>--</strong>
+                <span>天</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button
+          class="memory-record-nav memory-record-nav--next"
+          type="button"
+          data-memory-next
+          aria-label="下一条相遇记录"
+          disabled={!hasMultipleRecords}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
+      </article>
+    ) : (
+      <article class="memory-record-card memory-record-card--empty">
+        <span class="memory-record-eyebrow">相遇记录</span>
+        <h2>还没有记录</h2>
+        <p>在后台添加第一条记录后，这里会显示从那一天开始经过了多少天。</p>
+      </article>
+    )}
+  </div>
+</section>
+
+<style>
+  .memory-record-section {
+    padding: 0 1rem 1rem;
+  }
+
+  .memory-record-wrap {
+    width: min(100%, 80rem);
+    margin: 0 auto;
+  }
+
+  .memory-record-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+    align-items: stretch;
+    gap: 0.75rem;
+    min-height: 9.5rem;
+    padding: 0.875rem;
+    overflow: hidden;
+    color: var(--blog-text-primary);
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(250, 248, 245, 0.64)),
+      var(--blog-surface);
+    border: 1px solid rgba(255, 255, 255, 0.56);
+    border-radius: var(--blog-radius-xl);
+    box-shadow:
+      0 18px 45px rgba(17, 24, 28, 0.08),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .memory-record-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 16% 20%, rgba(90, 122, 158, 0.18), transparent 28%),
+      linear-gradient(90deg, transparent 0, rgba(59, 74, 107, 0.08) 48%, transparent 54%);
+    opacity: 0.86;
+  }
+
+  :root.dark .memory-record-card {
+    background:
+      linear-gradient(135deg, rgba(26, 29, 39, 0.88), rgba(19, 22, 28, 0.62)),
+      var(--blog-surface);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 18px 45px rgba(0, 0, 0, 0.28),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  }
+
+  :root.dark .memory-record-card::before {
+    background:
+      radial-gradient(circle at 16% 20%, rgba(90, 122, 158, 0.28), transparent 30%),
+      linear-gradient(90deg, transparent 0, rgba(90, 122, 158, 0.12) 48%, transparent 54%);
+  }
+
+  .memory-record-stage,
+  .memory-record-nav {
+    position: relative;
+    z-index: 1;
+  }
+
+  .memory-record-stage {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .memory-record-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0.5rem 0.25rem;
+  }
+
+  .memory-record-panel.is-entering-next {
+    animation: memorySlideNext 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .memory-record-panel.is-entering-prev {
+    animation: memorySlidePrev 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .memory-record-meta,
+  .memory-record-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .memory-record-eyebrow,
+  .memory-record-meta time {
+    font-family: var(--blog-font-mono);
+    font-size: 0.72rem;
+    line-height: 1;
+  }
+
+  .memory-record-eyebrow {
+    color: var(--blog-accent);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .memory-record-meta time {
+    color: var(--blog-text-tertiary);
+  }
+
+  .memory-record-copy {
+    min-width: 0;
+  }
+
+  .memory-record-copy h2,
+  .memory-record-card--empty h2 {
+    margin: 0;
+    color: var(--blog-text-primary);
+    font-size: clamp(1.2rem, 2.2vw, 1.85rem);
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: 0;
+  }
+
+  .memory-record-copy p,
+  .memory-record-card--empty p {
+    max-width: 44rem;
+    margin: 0.55rem 0 0;
+    color: var(--blog-text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.75;
+  }
+
+  .memory-record-days {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: baseline;
+    gap: 0.32rem;
+    min-width: 9rem;
+    justify-content: flex-end;
+    color: var(--blog-accent);
+  }
+
+  .memory-record-days strong {
+    font-family: var(--blog-font-mono);
+    font-size: clamp(2.35rem, 6vw, 4.8rem);
+    font-weight: 800;
+    line-height: 0.9;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .memory-record-days span {
+    color: var(--blog-text-secondary);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .memory-record-nav {
+    align-self: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--blog-text-secondary);
+    background: rgba(255, 255, 255, 0.52);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: var(--blog-radius-md);
+    cursor: pointer;
+    transition:
+      color 160ms ease,
+      background 160ms ease,
+      border-color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .memory-record-nav:hover:not(:disabled),
+  .memory-record-nav:focus-visible {
+    color: var(--blog-accent);
+    background: var(--blog-accent-light);
+    border-color: var(--blog-border);
+    transform: translateY(-1px);
+  }
+
+  .memory-record-nav:focus-visible {
+    outline: 2px solid var(--blog-accent);
+    outline-offset: 2px;
+  }
+
+  .memory-record-nav:disabled {
+    cursor: not-allowed;
+    opacity: 0.38;
+  }
+
+  .memory-record-nav svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  :root.dark .memory-record-nav {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .memory-record-card--empty {
+    display: block;
+    padding: 1.5rem;
+  }
+
+  @keyframes memorySlideNext {
+    from {
+      opacity: 0;
+      transform: translateX(2rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes memorySlidePrev {
+    from {
+      opacity: 0;
+      transform: translateX(-2rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @media (max-width: 720px) {
+    .memory-record-section {
+      padding-inline: 0;
+    }
+
+    .memory-record-card {
+      grid-template-columns: 2.35rem minmax(0, 1fr) 2.35rem;
+      gap: 0.45rem;
+      padding: 0.75rem;
+      min-height: 12rem;
+    }
+
+    .memory-record-main {
+      align-items: flex-start;
+      flex-direction: column-reverse;
+      gap: 0.85rem;
+    }
+
+    .memory-record-days {
+      min-width: 0;
+      justify-content: flex-start;
+    }
+
+    .memory-record-nav {
+      width: 2.35rem;
+      height: 2.35rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .memory-record-panel,
+    .memory-record-nav {
+      animation: none !important;
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  type MemoryRecord = {
+    title: string;
+    startDate: string;
+    content?: string;
+  };
+
+  function initMemoryRecordCards() {
+    document.querySelectorAll<HTMLElement>('.memory-record-card[data-records]').forEach((card) => {
+      if (card.dataset.memoryBound === 'true') return;
+      card.dataset.memoryBound = 'true';
+
+      let records: MemoryRecord[] = [];
+      try {
+        records = JSON.parse(card.dataset.records || '[]');
+      } catch (_) {
+        records = [];
+      }
+
+      if (!records.length) return;
+
+      let currentIndex = 0;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const panel = card.querySelector<HTMLElement>('[data-memory-panel]');
+      const title = card.querySelector<HTMLElement>('[data-memory-title]');
+      const content = card.querySelector<HTMLElement>('[data-memory-content]');
+      const date = card.querySelector<HTMLTimeElement>('[data-memory-date]');
+      const days = card.querySelector<HTMLElement>('[data-memory-days]');
+      const previous = card.querySelector<HTMLButtonElement>('[data-memory-prev]');
+      const next = card.querySelector<HTMLButtonElement>('[data-memory-next]');
+
+      const dayCount = (startDate: string) => {
+        const [year, month, day] = startDate.split('-').map(Number);
+        if (!year || !month || !day) return 1;
+        const start = new Date(year, month - 1, day);
+        const today = new Date();
+        const startLocal = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+        const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const diff = Math.floor((todayLocal - startLocal) / 86400000) + 1;
+        return Math.max(diff, 1);
+      };
+
+      const formattedDate = (startDate: string) => {
+        const [year, month, day] = startDate.split('-').map(Number);
+        if (!year || !month || !day) return startDate;
+        return `${year}年${month}月${day}日`;
+      };
+
+      const render = (record: MemoryRecord, direction: 'next' | 'prev' | 'none') => {
+        if (title) title.textContent = record.title;
+        if (content) content.textContent = record.content || '这一天被记录下来，于是它还在继续发光。';
+        if (date) {
+          date.dateTime = record.startDate;
+          date.textContent = formattedDate(record.startDate);
+        }
+        if (days) days.textContent = String(dayCount(record.startDate));
+
+        if (!panel || reduceMotion || direction === 'none') return;
+        panel.classList.remove('is-entering-next', 'is-entering-prev');
+        void panel.offsetWidth;
+        panel.classList.add(direction === 'next' ? 'is-entering-next' : 'is-entering-prev');
+      };
+
+      const move = (step: number, direction: 'next' | 'prev') => {
+        currentIndex = (currentIndex + step + records.length) % records.length;
+        render(records[currentIndex], direction);
+      };
+
+      render(records[currentIndex], 'none');
+      previous?.addEventListener('click', () => move(-1, 'prev'));
+      next?.addEventListener('click', () => move(1, 'next'));
+    });
+  }
+
+  initMemoryRecordCards();
+  document.addEventListener('astro:page-load', initMemoryRecordCards);
+</script>

@@ -21,6 +21,7 @@ export const ZONES = [
 export type ZoneKey = (typeof ZONES)[number]['key'];
 
 export const NAV_ITEMS = [
+  { label: '导入', href: '/keystatic-import' },
   { label: '首页', href: '/' },
   { label: '博客', href: '/blog' },
   { label: '项目', href: '/projects' },

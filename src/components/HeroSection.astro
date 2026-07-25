@@ -16,7 +16,7 @@ const {
     '无尽的远方，无穷的人们，都与我有关。',
   ],
 } = Astro.props;
-import { gallery1, gallery2, gallery3, avatar, heroBanner } from '../lib/imageMap';
+import { gallery1, gallery2, gallery3, avatar, heroBanner, publicHeroImagePaths } from '../lib/imageMap';
 const totalCards = 16;
 
 const cardImages = [
@@ -25,6 +25,7 @@ const cardImages = [
   gallery3.src,
   avatar.src,
   heroBanner.src,
+  ...publicHeroImagePaths,
 ];
 
 const cardFilters = [
@@ -47,7 +48,15 @@ const cardFilters = [
           Array.from({ length: totalCards }, (_, i) => (
             <div class="acrylic-card" style={{ '--i': i, '--total': totalCards }}>
               <div class="acrylic-inner">
-                <div class="acrylic-image" style={`background-image: url(${cardImages[i % cardImages.length]}); background-size: cover; background-position: center; filter: ${cardFilters[i % cardFilters.length]};`} />
+                <img
+                  class="acrylic-image"
+                  src={cardImages[i % cardImages.length]}
+                  alt=""
+                  loading="eager"
+                  decoding="async"
+                  draggable="false"
+                  style={`filter: ${cardFilters[i % cardFilters.length]};`}
+                />
                 <div class="acrylic-shine" />
               </div>
               <div class="acrylic-edge" />
@@ -97,6 +106,8 @@ const cardFilters = [
     height: 100%;
     transform-style: preserve-3d;
     animation: spin 16s linear infinite;
+    backface-visibility: hidden;
+    will-change: transform;
   }
 
   .acrylic-card {
@@ -108,6 +119,7 @@ const cardFilters = [
     margin: -56px -40px;
     transform-style: preserve-3d;
     transform: rotateY(calc(var(--i) * 360deg / var(--total))) translateZ(200px);
+    backface-visibility: hidden;
   }
 
   .acrylic-card:nth-child(odd) {
@@ -115,6 +127,7 @@ const cardFilters = [
     height: 88px;
     margin: -44px -32px;
     transform: rotateY(calc(var(--i) * 360deg / var(--total))) translateZ(120px);
+    backface-visibility: hidden;
   }
 
   .acrylic-inner {
@@ -124,8 +137,8 @@ const cardFilters = [
     overflow: hidden;
     position: relative;
     background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    isolation: isolate;
+    contain: paint;
     border: 1.5px solid rgba(255, 255, 255, 0.4);
     box-shadow:
       0 4px 20px rgba(0, 0, 0, 0.06),
@@ -138,10 +151,17 @@ const cardFilters = [
   }
 
   .acrylic-image {
+    display: block;
     width: 100%;
     height: 100%;
     position: relative;
     z-index: 0;
+    object-fit: cover;
+    object-position: center;
+    image-rendering: auto;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    user-select: none;
   }
 
   .acrylic-shine {

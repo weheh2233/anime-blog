@@ -19,6 +19,9 @@ export default defineConfig({
     plugins: [
       tailwindcss(),
     ],
+    optimizeDeps: {
+      include: ['@keystatic/core', '@keystatic/core/ui'],
+    },
     resolve: {
       alias: [{
         find: /^\.\/([^/]+)\/content\//,

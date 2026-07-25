@@ -5,6 +5,7 @@ import { resolveHeroImage } from '../lib/imageMap';
 export interface Props {
   title: string;
   description: string;
+  author?: string;
   slug: string;
   zone?: string;
   tags?: string[];
@@ -13,11 +14,11 @@ export interface Props {
   loading?: 'lazy' | 'eager';
 }
 
-const { title, description, slug, zone, tags = [], publishDate, heroImage, loading = 'lazy' } = Astro.props;
+const { title, description, author = 'Kira', slug, zone, tags = [], publishDate, heroImage, loading = 'lazy' } = Astro.props;
 const formattedDate = publishDate
   ? publishDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
   : '';
-const resolvedImage = resolveHeroImage(heroImage);
+const resolvedImage = resolveHeroImage(heroImage, slug);
 ---
 <article
   class="card-3d group cursor-pointer overflow-hidden transition-all duration-150"
@@ -73,7 +74,7 @@ const resolvedImage = resolveHeroImage(heroImage);
     </div>
 
     <!-- 内容层固定最小高度，防止文字长短导致卡片高度跳动 -->
-    <div class="p-4 relative" style="min-height: 140px;">
+    <div class="p-4 relative" style="min-height: 158px;">
       <!-- 专区 + 日期 -->
       <div class="flex items-center gap-2 mb-2">
         {zone && (
@@ -87,6 +88,10 @@ const resolvedImage = resolveHeroImage(heroImage);
       </div>
 
       <!-- 标题 -->
+      <div class="text-xs mb-2" style="color: var(--blog-text-tertiary);">
+        作者：<span style="color: var(--blog-text-secondary);">{author}</span>
+      </div>
+
       <h3 class="font-bold text-base mb-1 line-clamp-2 transition-colors duration-300 group-hover:text-[var(--blog-accent)]" style="color: var(--blog-text-primary);">
         {title}
       </h3>

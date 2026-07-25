@@ -1,4 +1,5 @@
 import { config, collection, singleton, fields } from '@keystatic/core';
+import { SITE } from './src/consts';
 
 const ZONES = [
   { label: '学习', value: '学习' },
@@ -37,6 +38,11 @@ export default config({
           label: '描述',
           validation: { isRequired: true },
           multiline: true,
+        }),
+        author: fields.text({
+          label: '作者',
+          defaultValue: SITE.author,
+          validation: { isRequired: true },
         }),
         publishDate: fields.date({
           label: '发布日期',
@@ -81,6 +87,56 @@ export default config({
         }),
       },
     }),
+    music: collection({
+      label: '音乐管理',
+      path: 'src/content/music/*',
+      slugField: 'title',
+      format: 'yaml',
+      columns: ['title', 'artists', 'enabled', 'order'],
+      schema: {
+        title: fields.slug({
+          name: {
+            label: '歌名',
+            validation: { isRequired: true },
+          },
+        }),
+        artists: fields.array(
+          fields.text({ label: '歌手' }),
+          {
+            label: '歌手',
+            itemLabel: (props) => props.value || '新歌手',
+          }
+        ),
+        album: fields.text({
+          label: '专辑',
+          defaultValue: '',
+        }),
+        audio: fields.file({
+          label: '音乐文件',
+          directory: 'public/music/',
+          publicPath: '/music/',
+          validation: { isRequired: true },
+        }),
+        cover: fields.image({
+          label: '封面图',
+          directory: 'public/images/music/',
+          publicPath: '/images/music/',
+        }),
+        duration: fields.number({
+          label: '时长（秒）',
+          defaultValue: 0,
+          validation: { min: 0 },
+        }),
+        order: fields.number({
+          label: '排序',
+          defaultValue: 0,
+        }),
+        enabled: fields.checkbox({
+          label: '启用',
+          defaultValue: true,
+        }),
+      },
+    }),
   },
 
   singletons: {
@@ -98,6 +154,27 @@ export default config({
             label: '自定义背景图',
             description: '可上传多张，每次刷新首页随机显示（与默认背景图一起轮换）',
             itemLabel: (props) => props.value?.filename || '新背景图',
+          }
+        ),
+        memoryRecords: fields.array(
+          fields.object({
+            title: fields.text({
+              label: '记录标题',
+              validation: { isRequired: true },
+            }),
+            startDate: fields.date({
+              label: '相遇日期',
+              validation: { isRequired: true },
+            }),
+            content: fields.text({
+              label: '记录短句',
+              multiline: true,
+            }),
+          }),
+          {
+            label: '相遇记录',
+            description: '首页小卡片展示的相遇/事件记录，会按相遇日期自动计算经过天数。',
+            itemLabel: (props) => props.value?.title || '新的相遇记录',
           }
         ),
       },

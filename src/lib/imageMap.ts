@@ -13,6 +13,25 @@ const map: Record<string, ImageMetadata> = {
   'avatar.png': avatar,
 };
 
+export const publicHeroImagePaths = [
+  '/images/FireFly1.png',
+  '/images/Xilian1.jpg',
+  '/images/butterfly.jpg',
+  '/images/little-butterfly.jpg',
+  '/images/zhefeng-scarf-cool.png',
+  '/images/yao-guang.jpg',
+  '/images/roxy.png',
+  '/images/xiamu.jpg',
+] as const;
+
+const fallbackHeroImages: readonly (ImageMetadata | string)[] = [
+  gallery1,
+  gallery2,
+  gallery3,
+  heroBanner,
+  ...publicHeroImagePaths,
+];
+
 /** 根据文件名（如 gallery-1.jpg）获取导入的图片对象 */
 export function getImageByFilename(filename: string): ImageMetadata | undefined {
   return map[filename];
@@ -24,14 +43,26 @@ export function getImageByPath(path: string): ImageMetadata | undefined {
   return map[filename];
 }
 
+export function getFallbackHeroImage(seed: string): ImageMetadata | string {
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  return fallbackHeroImages[hash % fallbackHeroImages.length];
+}
+
 /**
  * 解析 heroImage：
  * - imageMap 中的图片 → 返回 ImageMetadata（ArticleCard 用 <Image> 做 responsive 适配）
  * - Keystatic 上传到 public/images/ 的封面图 → 返回 public URL 字符串
  * - 不匹配 → undefined
  */
-export function resolveHeroImage(path: string | undefined | null): ImageMetadata | string | undefined {
-  if (!path) return undefined;
+export function resolveHeroImage(
+  path: string | undefined | null,
+  fallbackSeed?: string,
+): ImageMetadata | string | undefined {
+  if (!path) return fallbackSeed ? getFallbackHeroImage(fallbackSeed) : undefined;
   const imported = getImageByPath(path);
   if (imported) return imported;
   // Keystatic 后台上传的图片，直接当 public URL 用

@@ -1,0 +1,1446 @@
+---
+title: 网易云api的md文件
+description: 从导入的 Markdown 草稿开始整理这篇文章。
+publishDate: 2026-07-25
+zone: 编程
+tags:
+  - 网易云
+  - 外部接口api
+draft: false
+---
+# 获取歌单详情
+
+## 接口概述
+
+{% table %}
+- 项目
+- 内容
+---
+- 请求路径
+- `/openapi/music/basic/playlist/detail/get/v2`
+---
+- 请求方式
+- `GET` / `POST`
+---
+- 公共参数
+- IOT 公共参数（需在请求中携带 `appId`、`signType`、`accessToken`、`appSecret`、`device`、`timestamp` 等）
+{% /table %}
+
+---
+
+## 业务参数（`bizContent`）
+
+{% table %}
+- 参数名
+- 必选
+- 类型
+- 说明
+---
+- `playlistId`
+- ✅
+- `string`
+- 歌单 ID
+---
+- `originalCoverFlag`
+- ❌
+- `Boolean`
+- 是否使用原始封面（无水印，华语私人雷达第一首歌封面），默认 `false`
+---
+- `newCoverFlag`
+- ❌
+- `Boolean`
+- 是否获取原始新封面（左下角文字和右上角 logo），默认 `false`
+{% /table %}
+
+> **最佳实践参数示例：**\
+`{"playlistId":"A1EECD810B0C28EBD2C04445DD254AEE"}`
+
+---
+
+## 请求示例
+
+### 完整 URL 示例
+
+```http
+GET http://openapi.music.163.com/openapi/music/basic/playlist/detail/get/v2?bizContent%3d%7b%22playlistId%22%3a%225CF4DA1F06D2AB3AC61AB1A665C7D588%22%7d%26appId%3da301010000000000aadb4e5a28b45a67%26signType%3dRSA_SHA256%26accessToken%3d9ffc6030fb9b8d186a33d45d32779638907ef86e8d889918bd%26appSecret%3dde6882f913d59560c9f37345f4cb0053%26device%3d%7b%22deviceType%22%3a%22andrwear%22%2c%22os%22%3a%22otos%22%2c%22appVer%22%3a%220.1%22%2c%22channel%22%3a%22hm%22%2c%22model%22%3a%22kys%22%2c%22deviceId%22%3a%22357%22%2c%22brand%22%3a%22hm%22%2c%22osVer%22%3a%228.1.0%22%7d%26timestamp%3d1609751129255
+```
+
+---
+
+## 返回参数说明
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- `id`
+- `String`
+- 歌单 ID
+---
+- `name`
+- `String`
+- 歌单名称
+---
+- `coverImgUrl`
+- `String`
+- 歌单封面 URL
+---
+- `describe`
+- `String`
+- 歌单描述
+---
+- `creatorNickName`
+- `String`
+- 创建者昵称
+---
+- `creatorAvatarUrl`
+- `String`
+- 创建者头像
+---
+- `playCount`
+- `String`
+- 播放量
+---
+- `subscribedCount`
+- `String`
+- 收藏量
+---
+- `tags`
+- `List<String>`
+- 标签
+---
+- `creatorId`
+- `String`
+- 歌单创建人 ID
+---
+- `createTime`
+- `String`
+- 创建时间
+---
+- `subed`
+- `boolean`
+- 是否收藏
+---
+- `trackCount`
+- `int`
+- 歌单下歌曲总数
+---
+- `specialType`
+- `int`
+- 歌单类型（详见下表）
+---
+- `trackUpdateTime`
+- `long`
+- 最近更新时间
+{% /table %}
+
+### 歌单类型（`specialType`）
+
+{% table %}
+- 值
+- 说明
+---
+- `0`
+- 普通歌单
+---
+- `5`
+- 红心歌单
+---
+- `10`
+- 置顶歌单
+---
+- `20`
+- 尾部歌单
+---
+- `100`
+- 官方歌单
+---
+- `200`
+- 视频歌单
+---
+- `300`
+- 分享歌单
+{% /table %}
+
+### 返回码（`code`）
+
+{% table %}
+- 值
+- 说明
+---
+- `200`
+- 请求正常
+---
+- `404`
+- 获取资源不存在（或无权访问）
+---
+- `500`
+- 系统错误
+{% /table %}
+
+---
+
+## 返回示例
+
+### 成功响应（歌单详情）
+
+```json
+{
+  "code": 200,
+  "subCode": null,
+  "message": null,
+  "data": {
+    "id": "A1EECD810B0C28EBD2C04445DD254AEE",
+    "name": "古典宅家指南 | 古典旋律揉碎周末平庸琐事",
+    "coverImgUrl": "http://p1.music.126.net/4ehuVFDWzXd_Xa739K9RIQ==/109951168969635024.jpg?imageView=1&thumbnail=800y800&enlarge=1%7CimageView=1&watermark&type=1&image=b2JqL3c1bkRrTUtRd3JMRGpEekNtOE9tLzM2NTkzODYwNTc2LzAyMDYvMjAyNDUxMTE1NTgzMy94MzI1MTcxODA5MjcxMzgwNS5wbmc=&dx=0&dy=0%7Cwatermark&type=1&image=b2JqL3dvbkRsc0tVd3JMQ2xHakNtOEt4LzI3NjEwNDk3MDYyL2VlOTMvOTIxYS82NjE4LzdhMDc5ZDg0NTYyMDAwZmVkZWJmMjVjYjE4NjhkOWEzLnBuZw==&dx=0&dy=0%7CimageView=1",
+    "describe": "古典乐如一首安静而又温柔的诗 找到内心的宁静和安慰 与古典乐相伴点亮日常 让音乐成为宅家时最美妙的陪伴",
+    "creatorNickName": "云音乐古典星球",
+    "creatorAvatarUrl": "http://p1.music.126.net/RQa5zUJdEx46F4HWQ82eXQ==/109951166469319070.jpg",
+    "playCount": 67374,
+    "subscribedCount": 688,
+    "tags": null,
+    "createTime": 0,
+    "subed": false,
+    "trackCount": 54,
+    "specialType": 100,
+    "category": null,
+    "allFreeTrialFlag": false,
+    "trackUpdateTime": 1769066893169,
+    "creatorId": "72281C26EC3F1B116FB87B1728FA62F5"
+  }
+}
+```
+
+### 隐私/无权访问响应
+
+```json
+{
+  "code": 404,
+  "subCode": "",
+  "message": "无权访问该资源",
+  "data": null
+}
+```
+
+---
+
+> **注意：** 当歌单被创建者设置为隐私时，同样会返回 `404` 及上述无权访问信息。
+
+## 批量查询歌单详情
+
+### /openapi/music/basic/playlist/detail/list
+
+### 请求方式：
+
+- GET/POST
+
+### 公共参数：
+
+[IOT公共参数](https://developer.music.163.com/st/developer/document?docId=0f7801d7d6d24180b8fc9058d1ffe593)
+
+### 业务参数（bizContent）：
+
+{% table %}
+- 参数名
+- 必选
+- 类型
+- 说明
+---
+- playlistIds
+- 是
+- List<String>
+- 歌曲Id列表，序列化成json String；限制为500个Id及以下
+{% /table %}
+
+- 最佳实践：
+
+> {"playlistIds":["7747FEA04606F9838B75B022F81508BB","87621E9FB0B776C4EF38922B6D8559A7","C6F25F83CEB3993C61A1968CAABB417F"]}
+
+### 请求示例：
+
+```
+http://openapi.music.163.com/openapi/music/basic/playlist/detail/list?appId=a301020000000000746f96a196e52e07&device=%7B%22deviceType%22%3A%22andrcar%22%2C%22os%22%3A%22andrcar%22%2C%22appVer%22%3A%220.1%22%2C%22channel%22%3A%22didi%22%2C%22model%22%3A%22kys%22%2C%22deviceId%22%3A%22357%22%2C%22brand%22%3A%22didi%22%2C%22osVer%22%3A%228.1.0%22%2C%22clientIp%22%3A%22192.168.0.1%22%7D&accessToken=wb6c762fd61e274ea64cba6d4b03f13d67fc8c6a7a5a03023s&timestamp=1702455415674&playlistIds=356AD31B6D8DB20A28885E18032E618B
+```
+
+### 返回参数说明
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- id
+- String
+- 歌单Id
+---
+- name
+- String
+- 歌单名称
+---
+- describe
+- String
+- 歌单描述
+---
+- coverImgUrl
+- String
+- 歌单封面url
+---
+- creatorNickName
+- String
+- 创建者昵称
+---
+- playCount
+- String
+- 播放量
+---
+- subscribedCount
+- String
+- 收藏量
+---
+- tags
+- List<String>
+- 标签
+---
+- creatorId
+- String
+- 歌单创建人Id
+---
+- createTime
+- String
+- 创建时间
+---
+- subed
+- boolean
+- 是否收藏
+---
+- trackCount
+- int
+- 歌单下歌曲总数
+---
+- specialType
+- int
+- 歌单类型
+{% /table %}
+
+#### 歌单类型
+
+{% table %}
+- specialType
+- 说明
+---
+- 0
+- 普通歌单
+---
+- 5
+- 红心歌单
+---
+- 10
+- 置顶歌单
+---
+- 20
+- 尾部歌单
+---
+- 100
+- 官方歌单
+---
+- 200
+- 视频歌单
+---
+- 300
+- 分享歌单
+{% /table %}
+
+{% table %}
+- code
+- 说明
+---
+- 200
+- 请求正常
+---
+- 404
+- 获取资源不存在
+---
+- 500
+- 系统错误
+{% /table %}
+
+### 返回示例
+
+```
+{
+  "code": 200,
+  "subCode": null,
+  "message": null,
+  "data": [
+    {
+      "id": "356AD31B6D8DB20A28885E18032E618B",
+      "name": "周海媚参演原声集|一代人心中最美的周芷若",
+      "coverImgUrl": "http://p2.music.126.net/WzwcQGO24imYrO1GrkHSbw==/109951169157723223.jpg",
+      "describe": "12日晚，周海媚工作室发文透露周海媚因医治无效于12月11日病逝，享年57岁，作为一名优秀的演员，周海媚生前参演过多部的影视作品，代表作有《倚天屠龙记》《射雕英雄传》《武媚娘传奇》《香蜜沉沉烬如霜》等。\n\n一代人心中最美的周芷若，一路走好。",
+      "creatorNickName": "Beth丝丝",
+      "playCount": 164424,
+      "subscribedCount": 810,
+      "tags": null,
+      "createTime": 0,
+      "subed": false,
+      "trackCount": 19,
+      "specialType": 0,
+      "category": null,
+      "creatorId": "AB3C06E41A9F570D2F375FC0CB53EFFC"
+    }
+  ]
+}
+```
+
+## 获取歌单里的歌曲列表
+
+### /openapi/music/basic/playlist/song/list/get/v3
+
+### 请求方式：
+
+- GET/POST
+
+### 公共参数：
+
+[IOT公共参数](https://developer.music.163.com/st/developer/document?docId=0f7801d7d6d24180b8fc9058d1ffe593)
+
+### 业务参数（bizContent）：
+
+{% table %}
+- 参数名
+- 必选
+- 类型
+- 说明
+---
+- playlistId
+- 是
+- String
+- 歌单Id
+---
+- limit
+- 是
+- Int
+- 获取数据量（最多500条），建议每次取30条
+---
+- offset
+- 是
+- Int
+- 偏移量
+---
+- qualityFlag
+- 否
+- Boolean
+- 是否下发音质
+{% /table %}
+
+- 最佳实践：
+
+> {"playlistId":"A1EECD810B0C28EBD2C04445DD254AEE","limit":"30","offset":"0","qualityFlag":"true"}
+
+- 异步加载播放列表歌曲时，可以limit=500
+
+### 请求示例：
+
+```
+http://openapi.music.163.com/openapi/music/basic/playlist/song/list/get/v3?bizContent%3d%7b%22playlistId%22%3a%225CF4DA1F06D2AB3AC61AB1A665C7D588%22%2c%22limit%22%3a%2210%22%2c%22offset%22%3a%220%22%7d%26appId%3da301010000000000aadb4e5a28b45a67%26signType%3dRSA_SHA256%26accessToken%3d9ffc6030fb9b8d186a33d45d32779638907ef86e8d889918bd%26appSecret%3dde6882f913d59560c9f37345f4cb0053%26device%3d%7b%22deviceType%22%3a%22andrwear%22%2c%22os%22%3a%22otos%22%2c%22appVer%22%3a%220.1%22%2c%22channel%22%3a%22hm%22%2c%22model%22%3a%22kys%22%2c%22deviceId%22%3a%22357%22%2c%22brand%22%3a%22hm%22%2c%22osVer%22%3a%228.1.0%22%7d%26timestamp%3d1609751129255
+```
+
+### 返回参数说明
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- id
+- String
+- 歌曲Id
+---
+- name
+- String
+- 歌曲名称
+---
+- duration
+- long
+- 时长
+---
+- artists
+- List<Artist>
+- 艺人列表
+---
+- album
+- Album
+- 专辑信息
+---
+- playFlag
+- Boolean
+- 是否可以播放（true，false）
+---
+- downloadFlag
+- Boolean
+- 是否可以下载（true，false）
+---
+- payPlayFlag
+- Boolean
+- 是否需要付费才能播放（true、false）
+---
+- payDownloadFlag
+- Boolean
+- 是否需要付费才能下载（true、false）
+---
+- vipFlag
+- boolean
+- 需要VIP才能播放和下载
+---
+- vipPlayFlag
+- boolean
+- 需要VIP才能播放
+---
+- freeTrailFlag
+- boolean
+- 是否支持试听
+---
+- liked
+- boolean
+- 是否喜欢
+---
+- songMaxBr
+- int
+- 歌曲原本的最大码率（已失效）
+---
+- userMaxBr
+- int
+- 用户能播放的最大码率（已失效）
+---
+- maxBrLevel
+- String
+- 歌曲拥有最大码率对应的level
+---
+- plLevel
+- String
+- 用户可播放歌曲最大码率对应的level
+---
+- dlLevel
+- String
+- 用户可下载歌曲最大码率对应的level
+---
+- coverImgUrl
+- String
+- 封面url
+---
+- songTag
+- List<String>
+- 歌曲的曲风标签
+---
+- alg
+- String
+- 算法推荐使用，播放数据上报接口需透传该字段
+---
+- songFee
+- int
+- 歌曲付费类型
+---
+- qualities
+- int
+- 支持的音质列表
+---
+- visible
+- Boolean
+- 是否有版权（true，false）
+{% /table %}
+
+**Qualities**
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- dolbyMusic
+- long
+- 杜比
+---
+- skMusic
+- String
+- 沉浸环绕声
+---
+- jyMasterMusic
+- String
+- 超清母带
+---
+- jyEffectMusic
+- String
+- 高清臻音
+---
+- hrMusic
+- String
+- hi-res
+---
+- sqMusic
+- String
+- 无损
+---
+- hmusic
+- String
+- 极高
+---
+- mmusic
+- String
+- 较高
+---
+- lmusic
+- String
+- 标准
+{% /table %}
+
+**Artist**
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- id
+- String
+- 艺人Id
+---
+- name
+- String
+- 艺人名称
+{% /table %}
+
+**Album**
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- id
+- String
+- 专辑Id
+---
+- name
+- String
+- 专辑名称
+{% /table %}
+
+{% table %}
+- code
+- 说明
+---
+- 200
+- 请求正常
+---
+- 400
+- 参数错误
+---
+- 500
+- 系统错误
+{% /table %}
+
+{% table %}
+- subcode
+- 说明
+---
+- 200
+- 有返回数据
+---
+- 10007
+- 资源不存在
+{% /table %}
+
+### 返回示例
+
+正常情况
+
+```
+{
+  "code": 200,
+  "subCode": "200",
+  "message": null,
+  "data": [
+    {
+      "id": "E0D0F90596B94E7F72DAE19D2D440EC4",
+      "name": "紫荆花盛开",
+      "duration": 210667,
+      "artists": [
+        {
+          "id": "F303DF5534E993DF55770B50A718BA74",
+          "name": "李荣浩"
+        },
+        {
+          "id": "4459C411DED70104B4A690E9606B82F2",
+          "name": "梁咏琪"
+        }
+      ],
+      "album": {
+        "id": "38CF06364EE9B64D921301F135D8DDEB",
+        "name": "紫荆花盛开"
+      },
+      "playFlag": true,
+      "downloadFlag": false,
+      "payPlayFlag": false,
+      "payDownloadFlag": true,
+      "vipFlag": false,
+      "liked": false,
+      "coverImgUrl": "http://p1.music.126.net/R7yzr15Ftp4Mf59kTvy_uA==/109951167605022957.jpg",
+      "vipPlayFlag": false,
+      "accompanyFlag": null,
+      "songMaxBr": 999000,
+      "userMaxBr": 320000,
+      "maxBrLevel": "hires",
+      "plLevel": "exhigh",
+      "dlLevel": "none",
+      "songTag": [
+        "流行",
+        "粤语流行"
+      ],
+      "alg": null,
+      "privateCloudSong": false,
+      "freeTrailFlag": false,
+      "songFtFlag": false,
+      "freeTrialPrivilege": {
+        "cannotListenReason": null,
+        "resConsumable": false,
+        "userConsumable": false
+      },
+      "songFee": 8,
+      "playMaxbr": 999000,
+      "qualities": [
+        "skMusic",
+        "jyMasterMusic",
+        "jyEffectMusic",
+        "hrMusic",
+        "sqMusic",
+        "hmusic",
+        "mmusic",
+        "lmusic"
+      ],
+      "visible": true
+    }
+  ]
+}
+```
+
+歌单无数据时会提示（包括红心歌单）
+
+- 常出现场景：匿名用户红心歌单为空、某个歌单offset超过总数量
+- 被创作者设置隐私（客态无法访问）
+
+```
+{
+    "code":200,
+    "subCode":"10007",
+    "message":"资源不存在",
+    "data": null
+}
+```
+
+## 获取歌曲播放url
+
+### /openapi/music/basic/song/playurl/get/v2
+
+### 请求方式：
+
+- GET/POST
+
+### 公共参数：
+
+[IOT公共参数](https://developer.music.163.com/st/developer/document?category=api&type=common&docId=iotCommonParam)
+
+### 业务参数（bizContent）：
+
+{% table %}
+- 参数名
+- 必选
+- 类型
+- 说明
+---
+- songId
+- 是
+- string
+- 歌曲Id
+---
+- bitrate
+- 否
+- Int
+- 比特率：128（标准）、192（较高）、320（极高）、999（无损）、1999（Hi-Res）。默认320，若不能返回指定比特率则会返回较低的一个
+---
+- effects
+- 否
+- string
+- 支持杜比的音效：eac3、ac4
+---
+- level
+- 否
+- String
+- 高品质：vivid（臻音全景声，该音质需要单独配置）、sky（沉浸环绕声）、jymaster（超清母带）、jyeffect（高清臻音），拿不到会自动降级
+---
+- immerseType
+- 否
+- String
+- 支持的沉浸声环绕声类型：c51（c51类型）、ste（环绕立体声类型）、aac（aac类型）
+{% /table %}
+
+- 无损以上需要联系云音乐同事开通高品质服务
+- 原则：音效>音质
+- 优先级：杜比全景声>沉浸环绕声>超清母带>高清臻音>hires>无损>极高>标准
+
+### 请求示例：
+
+```
+http://openapi.music.163.com/openapi/music/basic/song/playurl/get/v2?bizContent=%7B%22songId%22:%22ABA2B0253CBC88DD6532D398F35890B4%22,%22bitrate%22:192%7D&appId=a301010000000000aadb4e5a28b45a67&signType=RSA_SHA256&accessToken=9ffc6030fb9b8d186a33d45d32779638907ef86e8d889918bd&appSecret=de6882f913d59560c9f37345f4cb0053&device=%7B%22deviceType%22:%22andrwear%22,%22os%22:%22otos%22,%22appVer%22:%220.1%22,%22channel%22:%22hm%22,%22model%22:%22kys%22,%22deviceId%22:%22357%22,%22brand%22:%22hm%22,%22osVer%22:%228.1.0%22%7D&timestamp=1609751129255
+```
+
+### 返回参数说明
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- url
+- String
+- 歌曲播放url
+---
+- size
+- Int
+- 歌曲大小
+---
+- md5
+- String
+- 歌曲的MD5
+---
+- br
+- Int
+- 返回的歌曲码率
+---
+- effects
+- String
+- 音效（目前仅杜比才有）
+---
+- privateCloudSong
+- boolean
+- 是否云盘歌曲
+---
+- level
+- String
+- 当前返回的歌曲码率对应的level
+---
+- freeTrail
+- FreeTrail
+- 试听起止时间，单位：s
+{% /table %}
+
+- 说明：如果音频时长小于25分钟，播放地址有效期为25分钟；如果音频时长大于25分钟，播放地址有效期为音频时长；
+- 车载、电视、手表、音箱已经是1天
+
+**subcode**
+
+{% table %}
+- subcode
+- 提示语
+- 说明
+---
+- 200
+- 有返回播放url数据
+- 正常获取
+---
+- 10002
+- 获取版权错误，请稍后重试
+- 服务异常
+---
+- 10003
+- 因合作方要求，请前往手机端收听
+- 当前端无版权
+---
+- 10004
+- 该歌曲为付费歌曲，请前往手机端购买后收听
+- 需要vip或者单独购买
+---
+- 10005
+- 未知错误，请稍后重试
+- 未知错误
+{% /table %}
+
+**FreeTrail**
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- start
+- Int
+- 试听开始时间
+---
+- end
+- Int
+- 试听结束时间
+{% /table %}
+
+### 返回示例
+
+获取播放地址成功
+
+```
+{
+  "code": 200,
+  "subCode": "200",
+  "message": null,
+  "data": {
+    "url": "http://m802.music.126.net/20230601192036/4c212981d175c84afdd9c065bec3a226/jd-musicrep-ts/ebd7/04e4/31f0/20cfa4d0d7a0687914ca23d2e61fc159.mp3",
+    "size": 1202721,
+    "md5": "20cfa4d0d7a0687914ca23d2e61fc159",
+    "br": 320012,
+    "effects": null,
+    "privateCloudSong": false,
+    "level": "exhigh",
+    "freeTrail": {
+      "start": 0,
+      "end": 30
+    }
+  }
+}
+```
+
+获取播放地址失败
+
+```
+{
+    "code": 200,
+    "subCode": "10003",
+    "message": "因合作方要求，请前往手机端收听",
+    "data": {
+        "url": null,
+        "size": 0,
+        "md5": null,
+        "br": 0
+    }
+}
+```
+
+## 批量获取歌曲播放url
+
+### /openapi/music/basic/batch/song/playurl/get
+
+### 请求方式：
+
+- GET/POST
+
+### 公共参数：
+
+[IOT公共参数](https://developer.music.163.com/st/developer/document?category=api&type=common&docId=iotCommonParam)
+
+### 业务参数（bizContent）：
+
+{% table %}
+- 参数名
+- 必选
+- 类型
+- 说明
+---
+- songIds
+- 是
+- List<String>
+- 歌曲Id列表,序列化成json String；限制为500个Id及以下
+---
+- bitrate
+- 否
+- Int
+- 比特率：128（标准）、320（极高）、999（无损）、1999（Hi-Res）。默认320，若不能返回指定比特率则会返回较低的一个
+---
+- effects
+- 否
+- string
+- 支持杜比的音效：eac3、ac4
+{% /table %}
+
+- 长度限制8k，如果songIds太长，需要把参数放到body中
+- 最佳实践：
+
+> {"bitrate":128,"effects":"eac3","songIds":["E6767DDA85289AA4118775DE0D6BCC32","CB328A27F2D13A4ED57B41534F70330E"]}
+
+### 请求示例：
+
+```
+https://openapi.music.163.com/openapi/music/basic/batch/song/playurl/get?appId=a301020000000000746f96a196e52e07&signType=RSA_SHA256&timestamp=1672815200645&device={"deviceType":"andrcar","os":"andrcar","appVer":"0.1","channel":"didi","model":"kys","deviceId":"357","brand":"didi","osVer":"8.1.0","clientIp":"192.168.0.1"}&bizContent={"songIds":["841E0DEE626146AD07BFF264FAC00C54","03DD6A098D75ADE676488EA2EB8679E7","E3CB8332A5F1281E1D989578666CA69C"],"bitrate":1999}&accessToken=sb68a98eaf073267ef0b854130beaf9aaf221ea794715d2a1a&sign=J78k17USszDAPbf54xzm%2B81tc%2F3rKNuGjvl%2BzIQE48%2FEwVQPG9pRHa8muObIuU8Olq9W8lohVLYBclIgvPrt%2FWx%2FyvKDWZ2Z9fzpjB%2FVRr0TNzf2AiEUOmn7ulA3N4KOOhxlMnSPc2g0jPLUFa2Yem3RcNz74YCcv0AAYweSpKsrnxyiE5zXWVOTF%2FhrCancHdWCoLG1Sbye5KTNvzyckLXhVmEycXRlwIseykEVMe6s24GXT02zIQWucuUnKCk5OHXJatysu2EwxbCGX%2FH63EayNv72XbwkD0q63%2FiXuBMm3eks5tkhmzucbBFbIUIrrSRjK52wuTZHpVY6im16wg%3D%3D
+```
+
+### 返回参数说明
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- url
+- String
+- 歌曲播放url
+---
+- size
+- Int
+- 歌曲大小
+---
+- md5
+- String
+- 歌曲的MD5
+---
+- br
+- Int
+- 返回的歌曲码率
+---
+- effects
+- String
+- 音效（目前仅杜比才有）
+---
+- privateCloudSong
+- boolean
+- 是否云盘歌曲
+---
+- level
+- String
+- 当前返回的歌曲码率对应的level
+---
+- freeTrail
+- FreeTrail
+- 试听起止时间，单位：s
+{% /table %}
+
+**level**
+
+{% table %}
+- 值
+- 音质
+- 比特率
+---
+- vivid
+- Audio Vivid
+- 无
+---
+- dobly
+- 杜比
+- 无
+---
+- sky
+- 沉浸环绕声
+- 无
+---
+- jymaster
+- 超清母带
+- 待定
+---
+- jyeffect
+- 高清臻音
+- 无
+---
+- hires
+- hires
+- 1999
+---
+- lossless
+- 无损
+- 999
+---
+- exhigh
+- 极高
+- 320
+---
+- standard
+- 标准
+- 128
+---
+- none
+- 不能播放/下载
+- 0
+{% /table %}
+
+**FreeTrail**
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- start
+- Int
+- 试听开始时间
+---
+- end
+- Int
+- 试听结束时间
+{% /table %}
+
+{% table %}
+- code
+- 说明
+---
+- 200
+- 请求正常
+{% /table %}
+
+{% table %}
+- subcode
+- 说明
+---
+- 200
+- 有返回播放url数据
+---
+- 10002
+- 获取版权错误，请稍后重试
+---
+- 10003
+- 因合作方要求，请前往手机端收听
+---
+- 10004
+- 该歌曲为付费歌曲，请前往手机端购买后收听
+---
+- 10005
+- 未知错误，请稍后重试
+{% /table %}
+
+### 返回示例
+
+获取播放地址成功
+
+```
+{
+  "code": 200,
+  "subCode": null,
+  "message": null,
+  "data": [
+    {
+      "id": "E6767DDA85289AA4118775DE0D6BCC32",
+      "url": "http://iot202.music.126.net/Yml6PWlvdCZjaGFubmVsPWx4X2dsYXNzZXMmbWFyaz1vc19oYXJkd2FyZSxxdWFsaXR5X3N0YW5kYXJkJnNjZW5lPWhhcmR3YXJl/20251226112834/f46e6df3abd0bf7bf3172557325960f1/jdymusic/obj/wo3DlMOGwrbDjj7DisKw/35850741888/c6d4/6170/1e6d/4c6d22ce1b33b6962fe206b5ce70f853.mp3?cdntag=Yml6PWlvdCZjaGFubmVsPWx4X2dsYXNzZXMmbWFyaz1vc19oYXJkd2FyZSxxdWFsaXR5X3N0YW5kYXJkJnNjZW5lPWhhcmR3YXJl",
+      "playUrlExpireTime": 1766634514316,
+      "size": 4374189,
+      "md5": "4c6d22ce1b33b6962fe206b5ce70f853",
+      "br": 128000,
+      "effects": null,
+      "privateCloudSong": false,
+      "level": "standard",
+      "freeTrail": null,
+      "freeTrialPrivilege": {
+        "cannotListenReason": null,
+        "resConsumable": false,
+        "userConsumable": false,
+        "listenType": null,
+        "freeLimitTagType": null
+      },
+      "duration": 273318,
+      "gain": -7.2215,
+      "peak": 1,
+      "type": "mp3"
+    },
+    {
+      "id": "065C086B43254186B8AE3D11AE063290",
+      "url": "http://iot202.music.126.net/Yml6PWlvdCZjaGFubmVsPWx4X2dsYXNzZXMmbWFyaz1vc19oYXJkd2FyZSxxdWFsaXR5X3N0YW5kYXJkJnNjZW5lPWhhcmR3YXJl/20251226112834/a474f98c4d650d8324e8ce724cf7fd0d/jdymusic/obj/wo3DlMOGwrbDjj7DisKw/36308452630/d42b/313e/b821/27c01cfdf3c5b54f79027c2e37ba2bea.mp3?cdntag=Yml6PWlvdCZjaGFubmVsPWx4X2dsYXNzZXMmbWFyaz1vc19oYXJkd2FyZSxxdWFsaXR5X3N0YW5kYXJkJnNjZW5lPWhhcmR3YXJl",
+      "playUrlExpireTime": 1766634514316,
+      "size": 3826221,
+      "md5": "27c01cfdf3c5b54f79027c2e37ba2bea",
+      "br": 128002,
+      "effects": null,
+      "privateCloudSong": false,
+      "level": "standard",
+      "freeTrail": null,
+      "freeTrialPrivilege": {
+        "cannotListenReason": null,
+        "resConsumable": false,
+        "userConsumable": false,
+        "listenType": null,
+        "freeLimitTagType": null
+      },
+      "duration": 239112,
+      "gain": 4.7785,
+      "peak": 0.2467,
+      "type": "mp3"
+    }
+  ]
+}
+```
+
+获取播放地址失败
+
+```
+{
+  "code": 200,
+  "subCode": null,
+  "message": null,
+  "data": [
+    {
+      "id": "841E0DEE626146AD07BFF264FAC00C54",
+      "url": "http://m701.music.126.net/20230223173942/a7cfb3b0e7660fdb100f3cc79a91cc6b/jdymusic/obj/w5zDlMODwrDDiGjCn8Ky/1548310106/4588/c55f/e4b9/12c092b26f62e1700d62601c6c281737.mp3",
+      "size": 2510933,
+      "md5": "12c092b26f62e1700d62601c6c281737",
+      "br": 320000,
+      "effects": null
+    },
+    {
+      "id": "03DD6A098D75ADE676488EA2EB8679E7",
+      "url": null,
+      "size": 0,
+      "md5": null,
+      "br": 0,
+      "effects": null
+    },
+    {
+      "id": "E3CB8332A5F1281E1D989578666CA69C",
+      "url": "http://m801.music.126.net/20230223173942/9d4dcb806fd70bc14c710eb077e68919/jdymusic/obj/wo3DlMOGwrbDjj7DisKw/8613533029/9f32/da33/dcd1/56a402e2db18b15244225404868f1a69.mp3",
+      "size": 4210564,
+      "md5": "56a402e2db18b15244225404868f1a69",
+      "br": 128001,
+      "effects": null
+    }
+  ]
+}
+```
+
+- 说明：如果音频时长小于25分钟，播放地址有效期为25分钟；如果音频时长大于25分钟，播放地址有效期为音频时长；
+
+## 获取歌曲无法播放toast文案
+
+### /openapi/music/basic/song/text/play/get/v2
+
+```
+获取的是歌曲的无法播放的兜底提示文案，尽量不用
+```
+
+### 请求方式：
+
+- GET/POST
+
+### 公共参数：
+
+[IOT公共参数](https://developer.music.163.com/st/developer/document?category=api&type=common&docId=iotCommonParam)
+
+### 业务参数（bizContent）：
+
+{% table %}
+- 参数名
+- 必选
+- 类型
+- 说明
+---
+- songId
+- 是
+- String
+- 歌曲id
+{% /table %}
+
+### 请求示例：
+
+```
+http://openapi.music.163.com/openapi/music/basic/song/text/play/get/v2?bizContent%3d%7b%22songId%22%3a%225CF4DA1F06D2AB3AC61AB1A665C7D588%22%7d%26appId%3da301010000000000aadb4e5a28b45a67%26signType%3dRSA_SHA256%26accessToken%3d9ffc6030fb9b8d186a33d45d32779638907ef86e8d889918bd%26appSecret%3dde6882f913d59560c9f37345f4cb0053%26device%3d%7b%22deviceType%22%3a%22andrwear%22%2c%22os%22%3a%22otos%22%2c%22appVer%22%3a%220.1%22%2c%22channel%22%3a%22hm%22%2c%22model%22%3a%22kys%22%2c%22deviceId%22%3a%22357%22%2c%22brand%22%3a%22hm%22%2c%22osVer%22%3a%228.1.0%22%7d%26timestamp%3d1609751129255
+```
+
+### 返回参数说明
+
+{% table %}
+- 参数名
+- 类型
+- 说明
+---
+- message
+- String
+- 歌曲无法获取toast文案
+{% /table %}
+
+### 提示文案枚举
+
+{% table %}
+- 文案
+- 说明
+---
+- 因合作方要求，暂不支持收听，请前往手机端
+- 当前端上无版权
+---
+- VIP歌曲，请开通会员；数字专辑，请前往手机端购买
+- 数字专辑
+---
+- VIP歌曲，请开通会员；数字专辑，请前往手机端购买
+- vip歌曲
+---
+- 因合作方要求，暂不支持收听，请前往手机端
+- 无版权
+{% /table %}
+
+### 返回示例
+
+```
+{
+  "code": 200,
+  "subCode": null,
+  "message": null,
+  "data": [
+    {
+      "message": "因合作方要求，暂不支持收听，请前往手机端。"
+    }
+  ]
+}
+```
+
+## 新版IOT端公共参数
+
+### 公共参数：
+
+{% table %}
+- 参数名
+- 类型
+- 必选
+- 说明
+---
+- appId
+- String
+- 是
+- 云音乐分配给开发者的应用ID，控制台上
+---
+- appSecret
+- String
+- 是
+- 云音乐分配给开发者的应用Secret，控制台上
+---
+- signType
+- String
+- 是
+- 应用生成签名字符串所使用的签名算法类型，目前支持：RSA_SHA256
+---
+- sign
+- String
+- 是
+- 请求参数的签名串，签名生成方式详见[RSA加密](https://developer.music.163.com/st/developer/document?docId=45aac8d12ccb4a98b14e2ea34a1a9cdb)
+---
+- timestamp
+- Long
+- 是
+- 请求发出的UNIX时间戳，毫秒级，服务端会校验是否在5分钟内，超时拒绝
+---
+- bizContent
+- String
+- 是
+- 业务请求参数的集合，json格式化，最大长度不限，除公共参数外所有业务请求参数都必须放在这个参数中传递，具体参照各Api文档
+---
+- accessToken
+- String
+- 是
+- 登录令牌 ，匿名接口不需要，其他接口必传。匿名登录时，每台设备需生成唯一的accessToken
+---
+- device
+- String
+- 是
+- 设备信息，json格式化
+{% /table %}
+
+- accessToken至少要保留512个字符空间，且支持base64 字符集(数字、大小写字母、+、/、=)
+
+  **device设备信息**
+
+{% table %}
+- 参数名
+- 类型
+- 必选
+- 说明
+---
+- channel
+- String
+- 是
+- 厂商标识，**由云音乐分配，需线下联系云音乐同事确认**
+---
+- deviceId
+- String
+- 是
+- **设备唯一Id**（每台设备需保持唯一，可传sn、mac、IMEI、vin、iccid等值）
+---
+- deviceType
+- String
+- 是
+- 设备类型，**需线下联系云音乐同事确认**
+---
+- appVer
+- String
+- 是
+- 客户端版本号（自研的云音乐版本号，可自定义，如1.1.1）
+---
+- os
+- String
+- 是
+- 端类型，**由云音乐分配，需线下联系云音乐同事确认**
+---
+- osVer
+- String
+- 是
+- 系统版本（ 车机系统，可自定义，如：8.1.0）
+---
+- brand
+- String
+- 是
+- 品牌，**需线下联系云音乐同事确认**
+---
+- model
+- String
+- 是
+- 设备型号 （车型，可自定义）
+---
+- clientIp
+- String
+- 是
+- 终端IP，设备调用接口时的出口IP地址
+{% /table %}
+
+- deviceId：不超过64个字符，只能包含数字、字母(区分大小写)
+
+- appVer：必须是x.x.x.x，不要太长，可以写死，用几段数字，“.”分隔，每段不超过四位
+
+  ### 公共出参文档
+
+  返回参数均为JSON格式：
+
+{% table %}
+- 参数名
+- 类型
+- 必选
+- 说明
+---
+- code
+- String
+- 是
+- 错误码
+---
+- message
+- String
+- 是
+- 错误信息
+---
+- data
+- Object
+- 是
+- 数据记录
+{% /table %}
+
+如若是列表数据则是在data下：
+
+{% table %}
+- 参数名
+- 类型
+- 必选
+- 说明
+---
+- recordCount
+- Int
+- 是
+- 总数
+---
+- records
+- List
+- 是
+- 列表数据
+{% /table %}
+
+### 请求说明
+
+- 统一采用https、post请求(部分接口用get)，加密形式：[RSA加密](https://developer.music.163.com/st/developer/document?docId=56fb9f543d6f4cc3b48a862ed408a075)
+- 线上环境域名：openapi.music.163.com
+- 如果是客户端发起的请求，请用客户端私钥进行加密，并将对应的公钥上传至开放平台->[应用管理](https://developer.music.163.com/st/developer/controlCenter/appManage) -> 进入应用详情页 -> 接口加密方式
+
+如果是由服务端发起的请求，请用服务端私钥进行加密，并将对应的公钥上传至开放平台->[应用管理](https://developer.music.163.com/st/developer/controlCenter/appManage) -> 进入应用详情页 -> 接口加密方式

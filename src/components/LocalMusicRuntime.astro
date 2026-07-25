@@ -10,10 +10,27 @@ import { LOCAL_MUSIC } from '../lib/localMusic';
     const audio = document.getElementById('global-music-audio');
     if (!audio) return;
 
+    const getInitialIndex = () => {
+      if (!tracks.length) return -1;
+
+      const storedIndex = Number(window.sessionStorage.getItem('local_music_current_index'));
+      if (Number.isInteger(storedIndex) && storedIndex >= 0 && storedIndex < tracks.length) {
+        return storedIndex;
+      }
+
+      const randomIndex = Math.floor(Math.random() * tracks.length);
+      window.sessionStorage.setItem('local_music_current_index', String(randomIndex));
+      return randomIndex;
+    };
+
+    const initialIndex = getInitialIndex();
+
     let state = {
       tracks,
-      currentIndex: tracks.length ? 0 : -1,
-      currentTrack: tracks[0] || null,
+      currentIndex: initialIndex,
+      currentTrack: initialIndex >= 0 ? tracks[initialIndex] : null,
+      currentTime: 0,
+      duration: initialIndex >= 0 ? tracks[initialIndex].duration : 0,
       status: tracks.length ? 'ready' : 'error',
       error: tracks.length ? null : 'No local music is configured',
     };
@@ -34,7 +51,15 @@ import { LOCAL_MUSIC } from '../lib/localMusic';
       const currentIndex = (index + state.tracks.length) % state.tracks.length;
       const currentTrack = state.tracks[currentIndex];
       audio.src = currentTrack.url;
-      setState({ currentIndex, currentTrack, status: 'ready', error: null });
+      window.sessionStorage.setItem('local_music_current_index', String(currentIndex));
+      setState({
+        currentIndex,
+        currentTrack,
+        currentTime: 0,
+        duration: currentTrack.duration || 0,
+        status: 'ready',
+        error: null,
+      });
     };
 
     const play = async () => {
@@ -67,10 +92,30 @@ import { LOCAL_MUSIC } from '../lib/localMusic';
       await play();
     };
 
+    const syncTime = () => {
+      setState({
+        currentTime: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+        duration: Number.isFinite(audio.duration) ? audio.duration : (state.currentTrack?.duration || 0),
+      });
+    };
+
+    const seek = (time) => {
+      if (!Number.isFinite(time)) return;
+      const duration = Number.isFinite(audio.duration) ? audio.duration : state.duration;
+      const nextTime = Math.max(0, Math.min(time, duration || time));
+      audio.currentTime = nextTime;
+      setState({ currentTime: nextTime });
+    };
+
     audio.addEventListener('play', () => setState({ status: 'playing', error: null }));
     audio.addEventListener('pause', () => {
       if (!audio.ended) setState({ status: 'paused' });
     });
+    audio.addEventListener('loadedmetadata', syncTime);
+    audio.addEventListener('durationchange', syncTime);
+    audio.addEventListener('timeupdate', syncTime);
+    audio.addEventListener('seeking', syncTime);
+    audio.addEventListener('seeked', syncTime);
     audio.addEventListener('ended', () => { void next(); });
     audio.addEventListener('error', () => {
       setState({ status: 'error', error: 'This audio file could not be played.' });
@@ -83,6 +128,7 @@ import { LOCAL_MUSIC } from '../lib/localMusic';
       toggle: async () => (state.status === 'playing' ? pause() : play()),
       next,
       previous,
+      seek,
       subscribe: (listener) => {
         listeners.add(listener);
         listener(state);
