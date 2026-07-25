@@ -24,7 +24,7 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
 
 <BaseLayout title={post.data.title} description={post.data.description} showToc>
   <ReadingProgress />
-  <article class="max-w-4xl mx-auto" itemscope itemtype="https://schema.org/Article">
+  <article class="max-w-5xl mx-auto" itemscope itemtype="https://schema.org/Article">
     <!-- 文章主体（data-pagefind-body 限制只索引此区域） -->
     <div data-pagefind-body>
     <!-- 文章头 -->
@@ -101,7 +101,7 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
 
 <style is:global>
   /* ===== 文章主区域毛玻璃底衬 ===== */
-  article.max-w-4xl {
+  article.max-w-5xl {
     background: var(--blog-glass);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -111,7 +111,7 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
   }
 
   @media (min-width: 640px) {
-    article.max-w-4xl {
+    article.max-w-5xl {
       padding: 2rem 2.5rem;
     }
   }

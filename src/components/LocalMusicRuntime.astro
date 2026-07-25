@@ -13,12 +13,12 @@ import { LOCAL_MUSIC } from '../lib/localMusic';
     const getInitialIndex = () => {
       if (!tracks.length) return -1;
 
-      const storedIndex = Number(window.sessionStorage.getItem('local_music_current_index'));
-      if (Number.isInteger(storedIndex) && storedIndex >= 0 && storedIndex < tracks.length) {
-        return storedIndex;
+      const previousIndex = Number(window.sessionStorage.getItem('local_music_current_index'));
+      let randomIndex = Math.floor(Math.random() * tracks.length);
+      if (tracks.length > 1 && Number.isInteger(previousIndex) && randomIndex === previousIndex) {
+        randomIndex = (randomIndex + 1 + Math.floor(Math.random() * (tracks.length - 1))) % tracks.length;
       }
 
-      const randomIndex = Math.floor(Math.random() * tracks.length);
       window.sessionStorage.setItem('local_music_current_index', String(randomIndex));
       return randomIndex;
     };

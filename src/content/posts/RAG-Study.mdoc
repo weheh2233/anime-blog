@@ -1,0 +1,190 @@
+---
+title: RAG-Study
+description: RAG 深入学习路线
+author: Kira
+publishDate: 2026-07-25
+zone: 编程
+tags:
+  - RAG
+  - AI
+draft: true
+---
+# RAG 深入学习路线
+
+## 第一阶段：理解基础组件（1-2周）
+
+先拆解 RAG 的三个核心模块，分别搞透：
+
+文档处理 & 分块（Chunking）
+
+- 不同分块策略：固定大小、语义分块、递归分块、基于文档结构
+- 关键权衡：块大小 × 重叠窗口 — 影响检索精度和上下文利用率
+- Metadata 附加策略
+
+向量化（Embedding）
+
+- Embedding 模型选型：text-embedding-3-small/large, bge-m3, e5-mistral, jina-embeddings 等
+- 多语言/跨语言 embedding
+- 维度选择与性能关系（降维、Matryoshka embedding）
+- 看看 MTEB leaderboard 理解模型排名
+
+检索与排序
+
+- 向量检索（ANN, HNSW, IVF）
+- 混合检索（BM25 + 向量），为什么几乎是标配
+- Reranker（cross-encoder），理解为什么 rerank 对质量提升巨大
+- 检索指标：Recall@k, MRR, NDCG
+
+## 第二阶段：落地一个完整系统（2-3周）
+
+用 LangChain/LlamaIndex 搭一个完整 pipeline，亲手踩坑：
+
+文档摄入 → 分块 → Embedding → 存入向量库 → 检索 → Rerank → 拼接提示 → 生成
+
+推荐的向量库学习顺序：Chroma（本地快速原型）→ Qdrant / Milvus（生产级）→ PGVector（如果已经有 PostgreSQL）
+
+这个阶段要回答的问题：
+
+- 检索不到关键信息怎么办？
+- 检索到太多噪声怎么办？
+- 上下文窗口怎么塞最有效？
+
+## 第三阶段：进阶技术（核心难点）
+
+这是区分"会用"和"懂 RAG"的分水岭：
+
+#### 检索质量提升
+
+- HyDE（Hypothetical Document Embedding）：用 LLM 先生成假设答案再检索
+- Query 重写/分解：把复杂问题拆成子问题分别检索
+- Multi-hop RAG：需要多步推理时，每一步都重新检索
+- Self-RAG：检索后让模型自我判断是否需要用检索结果
+
+#### 索引策略
+
+- 层级索引（摘要 → 段落 → 句子）
+- 图结构索引（GraphRAG — 微软的方案，适合全局性问题）
+- 多种分块粒度同时索引
+
+#### 生成质量优化
+
+- RAPTOR：递归摘要树，不同粒度的信息逐层加工
+- Corrective RAG：检测检索结果质量，决定是否重检索
+- Knowledge Graph RAG：实体链接 + 图谱遍历
+
+#### 评估体系
+
+- RAGAS 框架：faithfulness, answer relevance, context precision/recall
+- 人工评测集构建
+- A/B 测试检索策略
+
+## 第四阶段：生产化（持续）
+
+- 缓存策略（embedding 缓存、检索结果缓存）
+- 增量更新 / 实时索引
+- 多租户隔离
+- 延迟优化（检索 < 200ms + 生成流式）
+- 观测性（检索日志、用户反馈闭环）
+
+推荐资源
+
+┌──────────────────────────────────────────────────────────────────────────┬──────────────────────────┐
+│                                   资源                                   │           说明           │
+├──────────────────────────────────────────────────────────────────────────┼──────────────────────────┤
+│ Advanced RAG 论文合集 (https://github.com/TommyChxy/Advanced-RAG-Papers) │ 追踪前沿论文             │
+
+- Knowledge Graph RAG：实体链接 + 图谱遍历
+
+评估体系
+
+- RAGAS 框架：faithfulness, answer relevance, context precision/recall
+- 人工评测集构建
+- A/B 测试检索策略
+
+## 第四阶段：生产化（持续）
+
+- 缓存策略（embedding 缓存、检索结果缓存）
+- 增量更新 / 实时索引
+- 多租户隔离
+- 延迟优化（检索 < 200ms + 生成流式）
+- 观测性（检索日志、用户反馈闭环）
+
+推荐资源
+
+┌──────────────────────────────────────────────────────────────────────────┬──────────────────────────┐
+│                                   资源                                   │           说明           │
+├──────────────────────────────────────────────────────────────────────────┼──────────────────────────┤
+│ Advanced RAG 论文合集 (https://github.com/TommyChxy/Advanced-RAG-Papers) │ 追踪前沿论文             │
+├──────────────────────────────────────────────────────────────────────────┼──────────────────────────┤
+│ LlamaIndex 官方文档 + 教程                                               │ 实战最强框架文档         │
+├──────────────────────────────────────────────────────────────────────────┼──────────────────────────┤
+│ LangChain 的 RAG 模块                                                    │ 理解各个抽象层           │
+├──────────────────────────────────────────────────────────────────────────┼──────────────────────────┤
+│ 知乎/Medium 上的"Advanced RAG"系列                                       │ 中文社区最佳实践         │
+├──────────────────────────────────────────────────────────────────────────┼──────────────────────────┤
+│ Pinecone 的 RAG 博客                                                     │ 工程视角，讲得很清楚     │
+├──────────────────────────────────────────────────────────────────────────┼──────────────────────────┤
+│ Microsoft GraphRAG                                                       │ 如果你想做知识密集型场景 │
+└──────────────────────────────────────────────────────────────────────────┴──────────────────────────┘
+
+我的建议：直接做一个项目
+
+纸上得来终觉浅。最有效的方式是选一个你真的需要的知识库：
+
+1. 先做最基本版（一个文档、一个 embedding、一个检索）
+1. 然后逐个加：Hybrid Search → Reranker → Query Rewrite → Self-RAG
+1. 每一步都跑 RAGAS 做定量评估，看有没有真正提升
+1. 写实验笔记，记录每个改动带来的 Recall/Precision 变化
+
+具体场景是什么 — 文档问答、代码搜索、还是领域知识库
+
+---
+
+# 相关资源网址
+
+● 资源网址清单
+
+论文/代码仓库
+
+- Advanced RAG 论文合集: https://github.com/TommyChxy/Advanced-RAG-Papers
+- Microsoft GraphRAG: https://github.com/microsoft/graphrag
+
+### 框架文档
+
+- LlamaIndex 官方文档: https://docs.llamaindex.ai
+- LangChain RAG 文档: https://python.langchain.com/docs/use_cases/question_answering/
+
+### 向量库
+
+- Chroma: https://www.trychroma.com
+- Qdrant: https://qdrant.tech
+- Milvus: https://milvus.io
+- PGVector: https://github.com/pgvector/pgvector
+
+### 评估框架
+
+- RAGAS: https://docs.ragas.io
+
+### 评测/模型
+
+- MTEB Leaderboard: https://huggingface.co/spaces/mteb/leaderboard
+
+### 博客/教程
+
+- Pinecone 的 RAG 博客: https://www.pinecone.io/learn/retrieval-augmented-generation/
+- LlamaIndex 中文教程（知乎）: 直接在知乎搜 "Advanced RAG" / "LlamaIndex 实战"，质量高的不少
+
+### 相关论文原文（ArXiv）
+
+- HyDE: https://arxiv.org/abs/2212.10496
+- Self-RAG: https://arxiv.org/abs/2310.11511
+- RAPTOR: https://arxiv.org/abs/2401.18059
+- Corrective RAG: https://arxiv.org/abs/2401.15884
+- GraphRAG 论文: https://arxiv.org/abs/2404.16130
+
+### 中文社区
+
+- GitHub 上搜 "Advanced-RAG" 中文解读 repo 很多
+- 微信搜一搜 "RAG 实战" 也有一些不错的技术公众号文章
+
+建议先看 LlamaIndex 官方文档的 Understanding RAG (https://docs.llamaindex.ai/en/stable/understanding/) 章节，讲得系统且配有可运行代码。然后买个便宜的 API 边看边跑，比纯读快得多。
