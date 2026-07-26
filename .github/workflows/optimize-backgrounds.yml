@@ -1,0 +1,39 @@
+name: Optimize background images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/images/site/backgroundImages/**'
+      - 'src/content/site-backgrounds/**'
+      - 'scripts/optimize-background-images.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: write
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run optimize:backgrounds
+      - name: Commit optimized images
+        run: |
+          if git diff --quiet; then
+            echo "No background image changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/images/site/backgroundImages src/content/site-backgrounds
+          git commit -m "chore: optimize background images"
+          git push

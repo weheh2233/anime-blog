@@ -8,6 +8,8 @@ process.env.ASTRO_DEV_BACKGROUND = '1';
 
 const musicDir = resolve('src/content/music');
 const syncScript = resolve('scripts/sync-local-music.mjs');
+const backgroundDir = resolve('public/images/site/backgroundImages');
+const backgroundSyncScript = resolve('scripts/optimize-background-images.mjs');
 const syncMusic = () => {
   const result = spawnSync(process.execPath, [syncScript], {
     stdio: 'inherit',
@@ -16,7 +18,19 @@ const syncMusic = () => {
   return result.status === 0;
 };
 
+const optimizeBackgrounds = () => {
+  const result = spawnSync(process.execPath, [backgroundSyncScript], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+  return result.status === 0;
+};
+
 if (!syncMusic()) {
+  process.exit(1);
+}
+
+if (!optimizeBackgrounds()) {
   process.exit(1);
 }
 
@@ -28,6 +42,14 @@ const musicWatcher = fs.watch(musicDir, { recursive: true }, () => {
   }, 120);
 });
 
+let backgroundTimer;
+const backgroundWatcher = fs.watch(backgroundDir, { recursive: true }, () => {
+  clearTimeout(backgroundTimer);
+  backgroundTimer = setTimeout(() => {
+    optimizeBackgrounds();
+  }, 400);
+});
+
 const astroBin = resolve('node_modules/astro/bin/astro.mjs');
 const child = spawn(process.execPath, [astroBin, 'dev', '--host', '127.0.0.1', '--force'], {
   stdio: 'inherit',
@@ -36,7 +58,9 @@ const child = spawn(process.execPath, [astroBin, 'dev', '--host', '127.0.0.1', '
 
 child.on('exit', (code, signal) => {
   clearTimeout(syncTimer);
+  clearTimeout(backgroundTimer);
   musicWatcher.close();
+  backgroundWatcher.close();
   if (signal) {
     process.kill(process.pid, signal);
     return;
