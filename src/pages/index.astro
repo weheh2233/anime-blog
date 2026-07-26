@@ -7,27 +7,11 @@ import ScrollReveal from '../components/ScrollReveal.astro';
 import MemoryRecordCard from '../components/MemoryRecordCard.astro';
 import { SITE } from '../consts';
 import { getCollection } from 'astro:content';
-import fs from 'node:fs';
-import { load as loadYaml } from 'js-yaml';
-
-type MemoryRecord = {
-  title: string;
-  startDate: string | Date;
-  content?: string;
-};
+import { memoryRecords } from '../lib/siteSettings';
 
 const allPosts = await getCollection('posts', ({ data }) => !data.draft);
 allPosts.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf());
 const posts = allPosts.slice(0, 18);
-
-let memoryRecords: MemoryRecord[] = [];
-try {
-  const rawSettings = fs.readFileSync('src/content/site/index.yaml', 'utf-8');
-  const siteSettings = loadYaml(rawSettings) as { memoryRecords?: MemoryRecord[] } | null;
-  memoryRecords = Array.isArray(siteSettings?.memoryRecords) ? siteSettings.memoryRecords : [];
-} catch (_) {
-  memoryRecords = [];
-}
 ---
 
 <BaseLayout title="首页" description={SITE.description}>

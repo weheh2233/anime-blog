@@ -1,6 +1,11 @@
 /// <reference types="astro/client" />
 /// <reference types="node" />
 
+declare module '*?raw' {
+  const content: string;
+  export default content;
+}
+
 type MusicTrack = {
   id: number;
   name: string;

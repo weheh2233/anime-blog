@@ -9,7 +9,7 @@ import MouseTrail from '../components/MouseTrail.astro';
 import GlobalPomodoroNotifier from '../components/GlobalPomodoroNotifier';
 import LocalMusicRuntime from '../components/LocalMusicRuntime.astro';
 import { SITE } from '../consts';
-import fs from 'node:fs';
+import { backgroundImages } from '../lib/siteSettings';
 import { ClientRouter } from 'astro:transitions';
 
 // 背景图随机池 — 往 src/assets/bg/ 丢图即可自动加入
@@ -17,21 +17,8 @@ const bgPool = Object.values(
   import.meta.glob<{ default: import('astro').ImageMetadata }>('../assets/bg/*.{webp,jpg,png}', { eager: true })
 ).map(m => m.default.src);
 
-// Keystatic 后台自定义背景图（从 index.yaml 读取）
-try {
-  const raw = fs.readFileSync('src/content/site/index.yaml', 'utf-8');
-  const lines = raw.split('\n');
-  let inArray = false;
-  for (const line of lines) {
-    if (line.trim() === 'backgroundImages:') { inArray = true; continue; }
-    if (inArray && line.trimStart().startsWith('- ')) {
-      const url = line.trimStart().slice(2).trim();
-      if (url) bgPool.push(url);
-    } else if (inArray && !line.trimStart().startsWith('- ')) {
-      break; // array ended
-    }
-  }
-} catch (_) { /* 还没有站点设置文件 */ }
+// Keystatic 后台自定义背景图
+bgPool.push(...backgroundImages);
 
 interface Props {
   title: string;
