@@ -170,7 +170,7 @@ const hydrateEntryFromAudio = (filePath, data, slug, audio, audioFile) => {
   }
   if (metadata.picture && !next.cover) {
     const extension = metadata.picture.mime.includes('png') ? 'png' : 'jpg';
-    const coverUrl = `/images/music/${slug}-cover.${extension}`;
+    const coverUrl = `/images/music/${slug}/cover.${extension}`;
     const coverFile = publicUrlToFile(coverUrl);
     if (!fs.existsSync(coverFile)) {
       fs.mkdirSync(path.dirname(coverFile), { recursive: true });

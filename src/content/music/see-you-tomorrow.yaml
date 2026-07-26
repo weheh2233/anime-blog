@@ -1,9 +1,9 @@
 title: See You Tomorrow
 artists:
   - tnbee
+album: "See You Tomorrow (From \"Honkai: Star Rail\") [Cyrene Theme]"
 audio: /music/see-you-tomorrow/audio.mp3
 duration: 0
-order: 0
+order: 1
 enabled: true
-album: "See You Tomorrow (From \"Honkai: Star Rail\") [Cyrene Theme]"
-cover: /images/music/see-you-tomorrow-cover.jpg
+cover: /images/music/see-you-tomorrow/cover.jpg

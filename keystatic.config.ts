@@ -111,10 +111,9 @@ export default config({
           label: '专辑',
           defaultValue: '',
         }),
-        audio: fields.file({
-          label: '音乐文件',
-          directory: 'public/music/',
-          publicPath: '/music/',
+        audio: fields.text({
+          label: '音乐文件路径',
+          description: '请先将 MP3 手动放入 public/music/，然后填写以 /music/ 开头的网站访问路径。',
           validation: { isRequired: true },
         }),
         cover: fields.image({

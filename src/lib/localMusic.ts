@@ -11,17 +11,6 @@ export type LocalMusicTrack = {
 // Generated from src/content/music. Edit music entries in Keystatic instead.
 export const LOCAL_MUSIC: LocalMusicTrack[] = [
   {
-    "id": 2069362122,
-    "name": "See You Tomorrow",
-    "artists": [
-      "tnbee"
-    ],
-    "album": "See You Tomorrow (From \"Honkai: Star Rail\") [Cyrene Theme]",
-    "cover": "/images/music/see-you-tomorrow-cover.jpg",
-    "duration": 0,
-    "url": "/music/see-you-tomorrow/audio.mp3"
-  },
-  {
     "id": 177908434,
     "name": "\u554a\uff01\u7f8e\u4e3d\u5361\u6d1b",
     "artists": [
@@ -31,6 +20,17 @@ export const LOCAL_MUSIC: LocalMusicTrack[] = [
     "cover": "/images/music/a-meili-kaluo/cover.jpg",
     "duration": 0,
     "url": "/music/a-meili-kaluo/audio.mp3"
+  },
+  {
+    "id": 2069362122,
+    "name": "See You Tomorrow",
+    "artists": [
+      "tnbee"
+    ],
+    "album": "See You Tomorrow (From \"Honkai: Star Rail\") [Cyrene Theme]",
+    "cover": "/images/music/see-you-tomorrow/cover.jpg",
+    "duration": 0,
+    "url": "/music/see-you-tomorrow/audio.mp3"
   },
   {
     "id": 3567623806,
