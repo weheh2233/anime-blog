@@ -136,6 +136,35 @@ export default config({
         }),
       },
     }),
+    siteBackgrounds: collection({
+      label: '背景图管理',
+      path: 'src/content/site-backgrounds/*',
+      slugField: 'title',
+      format: 'yaml',
+      columns: ['title', 'enabled', 'order'],
+      schema: {
+        title: fields.slug({
+          name: {
+            label: '名称',
+            validation: { isRequired: true },
+          },
+        }),
+        image: fields.image({
+          label: '背景图',
+          directory: 'public/images/site/backgroundImages/',
+          publicPath: '/images/site/backgroundImages/',
+          validation: { isRequired: true },
+        }),
+        order: fields.number({
+          label: '排序',
+          defaultValue: 0,
+        }),
+        enabled: fields.checkbox({
+          label: '启用',
+          defaultValue: true,
+        }),
+      },
+    }),
   },
 
   singletons: {
@@ -143,18 +172,6 @@ export default config({
       label: '站点设置',
       path: 'src/content/site/',
       schema: {
-        backgroundImages: fields.array(
-          fields.image({
-            label: '背景图',
-            directory: 'public/images/site/',
-            publicPath: '/images/site/',
-          }),
-          {
-            label: '自定义背景图',
-            description: '可上传多张，每次刷新首页随机显示（与默认背景图一起轮换）',
-            itemLabel: (props) => props.value?.filename || '新背景图',
-          }
-        ),
         memoryRecords: fields.array(
           fields.object({
             title: fields.text({
