@@ -24,9 +24,9 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
 
 <BaseLayout title={post.data.title} description={post.data.description} showToc>
   <ReadingProgress />
-  <article class="max-w-5xl mx-auto" itemscope itemtype="https://schema.org/Article">
+  <article class="max-w-5xl mx-auto w-full min-w-0" itemscope itemtype="https://schema.org/Article">
     <!-- 文章主体（data-pagefind-body 限制只索引此区域） -->
-    <div data-pagefind-body>
+    <div data-pagefind-body class="min-w-0">
     <!-- 文章头 -->
     <header class="mb-10">
       <h1 class="text-3xl md:text-4xl font-bold mb-4 leading-tight" style="color: var(--blog-text-primary);" itemprop="headline">
@@ -84,7 +84,7 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
     )}
 
     <!-- Markdown 内容 -->
-    <div class="prose-custom max-w-none" itemprop="articleBody">
+    <div class="prose-custom max-w-none min-w-0" itemprop="articleBody">
       <Content />
     </div>
 
@@ -103,6 +103,10 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
 <style is:global>
   /* ===== 文章主区域毛玻璃底衬 ===== */
   article.max-w-5xl {
+    width: 100%;
+    max-width: min(64rem, 100%);
+    min-width: 0;
+    box-sizing: border-box;
     background: var(--blog-glass);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -118,6 +122,11 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
   }
 
   .prose-custom {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
     font-size: 1.0625rem;
     line-height: 1.8;
     color: var(--blog-text-primary);
@@ -151,14 +160,23 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
     background: var(--blog-accent-lighter);
   }
   .prose-custom pre {
+    max-width: 100%;
+    box-sizing: border-box;
     padding: 1rem;
     border-radius: var(--blog-radius-md);
     overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
     margin: 1.5rem 0;
     background: var(--blog-surface);
     border: 1px solid var(--blog-border);
   }
   .prose-custom pre code {
+    display: block;
+    min-width: max-content;
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
     background: none;
     padding: 0;
     font-size: 0.875rem;
@@ -171,9 +189,24 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
     font-style: italic;
   }
   .prose-custom img {
+    display: block;
+    width: auto;
     max-width: 100%;
+    height: auto;
     border-radius: var(--blog-radius-md);
     margin: 1.5rem 0;
+  }
+  .prose-custom table {
+    max-width: 100%;
+    border-collapse: collapse;
+  }
+  .prose-custom iframe,
+  .prose-custom video,
+  .prose-custom embed,
+  .prose-custom object {
+    display: block;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   .prose-custom ul, .prose-custom ol {
     padding-left: 1.5rem;
@@ -184,5 +217,50 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
     border: none;
     border-top: 1px solid var(--blog-border);
     margin: 2rem 0;
+  }
+
+  @media (max-width: 640px) {
+    article.max-w-5xl {
+      margin-left: 0;
+      margin-right: 0;
+      padding: 1rem;
+      border-radius: var(--blog-radius-lg);
+    }
+
+    .prose-custom {
+      font-size: 1rem;
+    }
+
+    .prose-custom table {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .prose-custom th,
+    .prose-custom td {
+      white-space: nowrap;
+    }
+
+    .prose-custom pre {
+      margin: 1rem 0;
+      padding: 0.875rem;
+      font-size: 0.8125rem;
+    }
+
+    .prose-custom pre code {
+      font-size: 0.8125rem;
+    }
+
+    .prose-custom img,
+    .prose-custom iframe,
+    .prose-custom video,
+    .prose-custom embed,
+    .prose-custom object {
+      max-width: 100%;
+    }
   }
 </style>
