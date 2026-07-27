@@ -4,8 +4,8 @@ export default {
   extends: [
     markdocShiki({
       themes: {
-        light: 'github-dark-default',
-        dark: 'github-light-default',
+        light: 'github-light-default',
+        dark: 'github-dark-default',
       },
       defaultColor: false,
       wrap: true,
