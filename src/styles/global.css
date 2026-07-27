@@ -17,6 +17,11 @@
   --blog-border-light: #edebe7;
   --blog-glass: rgba(255, 255, 255, 0.78);
   --blog-glass-border: rgba(0, 0, 0, 0.06);
+  --blog-code-bg: #282c34;
+  --blog-code-text: #abb2bf;
+  --blog-code-border: #3a404b;
+  --blog-code-gutter: #6b7280;
+  --blog-quote-bg: rgba(17, 17, 17, 0.05);
   --blog-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --blog-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
   --blog-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.04);
@@ -47,6 +52,11 @@
   --blog-border-light: #232634;
   --blog-glass: rgba(26, 29, 39, 0.75);
   --blog-glass-border: rgba(255, 255, 255, 0.06);
+  --blog-code-bg: #f4f4f5;
+  --blog-code-text: #24292f;
+  --blog-code-border: #d4d4d8;
+  --blog-code-gutter: #71717a;
+  --blog-quote-bg: rgba(255, 255, 255, 0.08);
   --blog-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --blog-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   --blog-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.25);

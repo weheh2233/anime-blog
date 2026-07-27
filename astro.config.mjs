@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import markdoc from '@astrojs/markdoc';
+import markdocShiki from '@astrojs/markdoc/shiki';
 import keystatic from '@keystatic/astro';
 import vercel from '@astrojs/vercel';
 import tailwindcss from '@tailwindcss/vite';
@@ -37,14 +38,29 @@ export default defineConfig({
 
   integrations: [
     react(),
-    markdoc(),
+    markdoc({
+      extends: [
+        markdocShiki({
+          themes: {
+            light: 'github-dark-default',
+            dark: 'github-light-default',
+          },
+          defaultColor: false,
+          wrap: true,
+          langs: [],
+        }),
+      ],
+    }),
     keystatic(),
   ],
 
   // Shiki 代码高亮
   markdown: {
     shikiConfig: {
-      theme: 'github-dark-default',
+      themes: {
+        light: 'github-dark-default',
+        dark: 'github-light-default',
+      },
       defaultColor: false,
       wrap: true,
       langs: [],

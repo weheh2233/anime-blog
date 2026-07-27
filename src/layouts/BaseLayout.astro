@@ -38,6 +38,13 @@ const { title, description, hideSidebar, showToc } = Astro.props;
     <meta name="description" content={description || SITE.description} />
     <meta name="theme-color" content="#f5f2ed" />
     <meta name="color-scheme" content="light dark" />
+    <script is:inline>
+      (() => {
+        const isDark = localStorage.getItem('blog-theme') === 'dark';
+        document.documentElement.classList.toggle('dark', isDark);
+        document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -241,9 +248,49 @@ const { title, description, hideSidebar, showToc } = Astro.props;
     <!-- 主题 -->
     <script is:inline>
       (function() {
-        if (localStorage.getItem('blog-theme') === 'dark') {
-          document.documentElement.classList.add('dark');
+        const themeKey = 'blog-theme';
+
+        function updateThemeUI() {
+          const isDark = document.documentElement.classList.contains('dark');
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+
+          document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+            button.setAttribute('aria-pressed', String(isDark));
+            button.querySelector('.theme-sun-icon, #theme-sun')?.style.setProperty('display', isDark ? 'none' : 'block');
+            button.querySelector('.theme-moon-icon, #theme-moon')?.style.setProperty('display', isDark ? 'block' : 'none');
+          });
         }
+
+        function applyStoredTheme() {
+          const isDark = localStorage.getItem(themeKey) === 'dark';
+          document.documentElement.classList.toggle('dark', isDark);
+          updateThemeUI();
+        }
+
+        function toggleTheme() {
+          const isDark = !document.documentElement.classList.contains('dark');
+          localStorage.setItem(themeKey, isDark ? 'dark' : 'light');
+          document.documentElement.classList.toggle('dark', isDark);
+          updateThemeUI();
+        }
+
+        if (!window.__blogThemeRuntime) {
+          window.__blogThemeRuntime = { applyStoredTheme, toggleTheme };
+
+          document.addEventListener('click', (event) => {
+            const target = event.target;
+            const button = target instanceof Element ? target.closest('[data-theme-toggle]') : null;
+            if (!button) return;
+            event.preventDefault();
+            toggleTheme();
+          });
+
+          document.addEventListener('astro:before-swap', applyStoredTheme);
+          document.addEventListener('astro:after-swap', applyStoredTheme);
+          document.addEventListener('astro:page-load', applyStoredTheme);
+        }
+
+        applyStoredTheme();
       })();
     </script>
 

@@ -84,6 +84,7 @@ const currentPath = Astro.url.pathname;
       <!-- 主题切换 -->
       <button
         id="theme-toggle"
+        data-theme-toggle
         class="w-8 h-8 flex items-center justify-center rounded-[var(--blog-radius-sm)] transition-colors"
         style="color: var(--blog-text-secondary);"
         onmouseover="this.style.background='var(--blog-accent-light)'"
@@ -352,27 +353,6 @@ const currentPath = Astro.url.pathname;
 
 <script>
   // 主题切换
-  const toggle = document.getElementById('theme-toggle');
-  const sun = document.getElementById('theme-sun');
-  const moon = document.getElementById('theme-moon');
-
-  function updateThemeIcons() {
-    const isDark = document.documentElement.classList.contains('dark');
-    if (sun) sun.style.display = isDark ? 'block' : 'none';
-    if (moon) moon.style.display = isDark ? 'none' : 'block';
-  }
-
-  updateThemeIcons();
-
-  if (toggle) {
-    toggle.addEventListener('click', () => {
-      document.documentElement.classList.toggle('dark');
-      const isDark = document.documentElement.classList.contains('dark');
-      localStorage.setItem('blog-theme', isDark ? 'dark' : 'light');
-      updateThemeIcons();
-    });
-  }
-
   // 移动端菜单
   const menuBtn = document.getElementById('menu-btn');
   const mobileMenu = document.getElementById('mobile-menu');

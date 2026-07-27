@@ -157,7 +157,9 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
     font-size: 0.9em;
     padding: 0.2em 0.4em;
     border-radius: 4px;
-    background: var(--blog-accent-lighter);
+    color: var(--blog-code-text);
+    background: var(--blog-code-bg);
+    border: 1px solid var(--blog-code-border);
   }
   .prose-custom pre {
     max-width: 100%;
@@ -168,8 +170,16 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
     overscroll-behavior-inline: contain;
     -webkit-overflow-scrolling: touch;
     margin: 1.5rem 0;
-    background: var(--blog-surface);
-    border: 1px solid var(--blog-border);
+    color: var(--blog-code-text);
+    background: var(--blog-code-bg);
+    border: 1px solid var(--blog-code-border);
+  }
+  .prose-custom pre.astro-code {
+    padding: 0;
+    background: var(--blog-code-bg) !important;
+    color: var(--blog-code-text) !important;
+    border-color: var(--blog-code-border);
+    counter-reset: code-line;
   }
   .prose-custom pre code {
     display: block;
@@ -180,10 +190,68 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
     background: none;
     padding: 0;
     font-size: 0.875rem;
+    border: 0;
+  }
+  .prose-custom pre.astro-code code {
+    padding: 0.95rem 0;
+  }
+  .prose-custom pre.astro-code .line {
+    display: block;
+    position: relative;
+    min-height: 1.5em;
+    padding: 0 1rem 0 3.75rem;
+  }
+  .prose-custom pre.astro-code .line::before {
+    content: counter(code-line);
+    counter-increment: code-line;
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3rem;
+    padding-right: 0.75rem;
+    color: var(--blog-code-gutter);
+    border-right: 1px solid color-mix(in srgb, var(--blog-code-border) 85%, transparent);
+    text-align: right;
+    user-select: none;
+  }
+  .prose-custom pre.astro-code span {
+    color: var(--shiki-light) !important;
+  }
+  :root.dark .prose-custom pre.astro-code span {
+    color: var(--shiki-dark) !important;
+  }
+  .prose-custom pre.raw-code-block {
+    padding: 0;
+    background: var(--blog-code-bg);
+    color: var(--blog-code-text);
+  }
+  .prose-custom pre.raw-code-block .raw-code {
+    padding: 0.95rem 0;
+  }
+  .prose-custom pre.raw-code-block .line {
+    display: block;
+    position: relative;
+    min-height: 1.5em;
+    padding: 0 1rem 0 3.75rem;
+  }
+  .prose-custom pre.raw-code-block .line-number {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3rem;
+    padding-right: 0.75rem;
+    color: var(--blog-code-gutter);
+    border-right: 1px solid color-mix(in srgb, var(--blog-code-border) 85%, transparent);
+    text-align: right;
+    user-select: none;
+  }
+  .prose-custom pre.raw-code-block .line-content {
+    white-space: pre;
   }
   .prose-custom blockquote {
     border-left: 3px solid var(--blog-accent);
+    background: var(--blog-quote-bg);
     padding-left: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
     margin: 1.5rem 0;
     color: var(--blog-text-secondary);
     font-style: italic;
@@ -199,6 +267,19 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
   .prose-custom table {
     max-width: 100%;
     border-collapse: collapse;
+    background: var(--blog-surface);
+    border: 1px solid var(--blog-border);
+  }
+  .prose-custom th,
+  .prose-custom td {
+    padding: 0.65rem 0.8rem;
+    border: 1px solid var(--blog-border);
+    text-align: left;
+  }
+  .prose-custom th {
+    color: var(--blog-text-primary);
+    background: var(--blog-accent-light);
+    font-weight: 700;
   }
   .prose-custom iframe,
   .prose-custom video,
@@ -251,8 +332,44 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
       font-size: 0.8125rem;
     }
 
+    .prose-custom pre.astro-code {
+      padding: 0;
+    }
+
     .prose-custom pre code {
       font-size: 0.8125rem;
+    }
+
+    .prose-custom pre.astro-code code {
+      padding: 0.75rem 0;
+    }
+
+    .prose-custom pre.astro-code .line {
+      padding-left: 3.25rem;
+      padding-right: 0.75rem;
+    }
+
+    .prose-custom pre.astro-code .line::before {
+      width: 2.5rem;
+      padding-right: 0.625rem;
+    }
+
+    .prose-custom pre.raw-code-block {
+      padding: 0;
+    }
+
+    .prose-custom pre.raw-code-block .raw-code {
+      padding: 0.75rem 0;
+    }
+
+    .prose-custom pre.raw-code-block .line {
+      padding-left: 3.25rem;
+      padding-right: 0.75rem;
+    }
+
+    .prose-custom pre.raw-code-block .line-number {
+      width: 2.5rem;
+      padding-right: 0.625rem;
     }
 
     .prose-custom img,
@@ -264,3 +381,38 @@ const resolvedHeroImage = resolveHeroImage(post.data.heroImage, post.id);
     }
   }
 </style>
+
+<script>
+  function addRawCodeLineNumbers() {
+    document.querySelectorAll('.prose-custom pre[data-language]:not(.astro-code)').forEach((pre) => {
+      if (pre.dataset.lineNumbered === 'true') return;
+
+      const source = (pre.textContent || '').replace(/\n$/, '');
+      const code = document.createElement('code');
+      code.className = 'raw-code';
+
+      source.split('\n').forEach((line, index) => {
+        const row = document.createElement('span');
+        row.className = 'line';
+
+        const number = document.createElement('span');
+        number.className = 'line-number';
+        number.textContent = String(index + 1);
+
+        const content = document.createElement('span');
+        content.className = 'line-content';
+        content.textContent = line || '\u200b';
+
+        row.append(number, content);
+        code.append(row);
+      });
+
+      pre.replaceChildren(code);
+      pre.classList.add('raw-code-block');
+      pre.dataset.lineNumbered = 'true';
+    });
+  }
+
+  addRawCodeLineNumbers();
+  document.addEventListener('astro:page-load', addRawCodeLineNumbers);
+</script>

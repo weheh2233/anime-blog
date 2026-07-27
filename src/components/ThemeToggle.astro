@@ -5,6 +5,7 @@
 
 <button
   class="theme-toggle-btn w-8 h-8 flex items-center justify-center rounded-[var(--blog-radius-sm)] transition-colors"
+  data-theme-toggle
   style="color: var(--blog-text-secondary); background: transparent; border: 1px solid var(--blog-border); cursor: pointer;"
   aria-label="切换主题"
 >
@@ -16,24 +17,3 @@
     <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
   </svg>
 </button>
-
-<script>
-  document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
-    const sun = btn.querySelector('.theme-sun-icon');
-    const moon = btn.querySelector('.theme-moon-icon');
-
-    function update() {
-      const isDark = document.documentElement.classList.contains('dark');
-      if (sun) sun.style.display = isDark ? 'none' : 'block';
-      if (moon) moon.style.display = isDark ? 'block' : 'none';
-    }
-    update();
-
-    btn.addEventListener('click', () => {
-      document.documentElement.classList.toggle('dark');
-      const isDark = document.documentElement.classList.contains('dark');
-      localStorage.setItem('blog-theme', isDark ? 'dark' : 'light');
-      update();
-    });
-  });
-</script>
