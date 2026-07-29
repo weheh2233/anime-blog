@@ -166,10 +166,19 @@ const { title, description, hideSidebar, showToc } = Astro.props;
             </style>
             <script is:inline>
               (function() {
+                const cleanupKey = '__animeBlogTocCleanup';
+
                 function buildTOC() {
                   const article = document.querySelector('[itemprop="articleBody"]');
                   const toc = document.getElementById('article-toc');
                   if (!article || !toc) return;
+
+                  if (typeof window[cleanupKey] === 'function') {
+                    window[cleanupKey]();
+                  }
+
+                  toc.replaceChildren();
+                  toc.parentElement.style.display = '';
 
                   const headings = article.querySelectorAll('h2, h3');
                   if (headings.length === 0) {
@@ -214,6 +223,10 @@ const { title, description, hideSidebar, showToc } = Astro.props;
                     });
                   }
                   window.addEventListener('scroll', onScroll, { passive: true });
+                  window[cleanupKey] = () => {
+                    window.removeEventListener('scroll', onScroll);
+                    window[cleanupKey] = null;
+                  };
                   onScroll();
                 }
 
