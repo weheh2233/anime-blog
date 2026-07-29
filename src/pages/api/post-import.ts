@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import {
+  createKeystaticDraftPayload,
   isImportError,
-  persistPostImport,
   preparePostImport,
   type UploadedAsset,
 } from '../../lib/postImport';
@@ -41,16 +41,16 @@ export const POST: APIRoute = async ({ request }) => {
       },
     });
 
-    const saved = await persistPostImport(prepared, { githubAccessToken });
+    const keystaticDraft = await createKeystaticDraftPayload(prepared, { githubAccessToken });
 
     return json({
       ok: true,
-      slug: saved.slug,
-      filename: saved.filename,
-      frontmatter: saved.frontmatter,
-      writtenImagePaths: saved.writtenImagePaths,
-      editUrl: saved.editUrl,
-      committedVia: saved.committedVia,
+      slug: prepared.slug,
+      filename: prepared.filename,
+      frontmatter: prepared.frontmatter,
+      writtenImagePaths: prepared.writtenImagePaths,
+      createUrl: keystaticDraft.createUrl,
+      keystaticDraft,
     });
   } catch (error) {
     const status = isImportError(error) ? error.status : (error as Error & { status?: number }).status || 500;

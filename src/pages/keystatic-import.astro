@@ -189,9 +189,22 @@ if (!(await hasKeystaticRepositoryAccess(Astro.request))) {
     if (!articleInput.files?.[0]) return;
 
     resultBox.hidden = true;
+
+    const draftKey = ['collection-create', 'posts'];
+    try {
+      const existingDraft = await readKeystaticDraft(draftKey);
+      if (existingDraft && !window.confirm('后台已有一篇未保存的新建文章草稿，本次导入会覆盖它。继续导入吗？')) {
+        return;
+      }
+    } catch {
+      if (!window.confirm('无法检查后台草稿状态。继续导入会覆盖同类型新建草稿，是否继续？')) {
+        return;
+      }
+    }
+
     submitButton.disabled = true;
-    submitButton.textContent = '生成中...';
-    previewState.textContent = '写入中';
+    submitButton.textContent = '搬运中...';
+    previewState.textContent = '准备后台草稿';
 
     const body = new FormData();
     body.set('article', articleInput.files[0]);
@@ -220,12 +233,15 @@ if (!(await hasKeystaticRepositoryAccess(Astro.request))) {
         throw new Error(data.error || '导入失败');
       }
 
-      resultMessage.textContent = `${data.filename} 已保存为草稿，图片 ${data.writtenImagePaths.length} 个。`;
-      resultLink.href = data.editUrl;
+      await writeKeystaticDraft(data.keystaticDraft);
+
+      const imageCount = Array.isArray(data.writtenImagePaths) ? data.writtenImagePaths.length : 0;
+      resultMessage.textContent = `${data.filename} 已搬到后台草稿，图片 ${imageCount} 个。请在后台确认后保存。`;
+      resultLink.href = data.createUrl;
       resultBox.hidden = false;
-      previewState.textContent = '已生成';
+      previewState.textContent = '已搬到后台';
       window.setTimeout(() => {
-        window.location.href = data.editUrl;
+        window.location.href = data.createUrl;
       }, 800);
     } catch (error) {
       showIssues([error instanceof Error ? error.message : '导入失败']);
@@ -238,6 +254,71 @@ if (!(await hasKeystaticRepositoryAccess(Astro.request))) {
 
   function appendIfFilled(body, name, value) {
     if (String(value || '').trim()) body.set(name, String(value).trim());
+  }
+
+  async function readKeystaticDraft(key) {
+    const db = await openKeystaticDatabase();
+    return runDraftRequest(db, 'readonly', (store) => store.get(key));
+  }
+
+  async function writeKeystaticDraft(payload) {
+    if (!payload || !Array.isArray(payload.key) || !Array.isArray(payload.files)) {
+      throw new Error('导入接口没有返回可用的后台草稿数据');
+    }
+
+    const files = new Map(
+      payload.files.map(([filePath, encoded]) => [filePath, base64ToBytes(encoded)])
+    );
+    const value = {
+      version: 1,
+      savedAt: new Date(payload.savedAt),
+      slug: payload.slug,
+      files,
+    };
+    const db = await openKeystaticDatabase();
+    await runDraftRequest(db, 'readwrite', (store) => store.put(value, payload.key));
+  }
+
+  function openKeystaticDatabase() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('keystatic', 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains('items')) {
+          request.result.createObjectStore('items');
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('无法打开 Keystatic 草稿数据库'));
+    });
+  }
+
+  function runDraftRequest(db, mode, createRequest) {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction('items', mode);
+      const request = createRequest(transaction.objectStore('items'));
+      let result;
+      request.onsuccess = () => {
+        result = request.result;
+      };
+      request.onerror = () => reject(request.error || new Error('Keystatic 草稿读写失败'));
+      transaction.oncomplete = () => {
+        db.close();
+        resolve(result);
+      };
+      transaction.onabort = () => {
+        db.close();
+        reject(transaction.error || new Error('Keystatic 草稿事务失败'));
+      };
+    });
+  }
+
+  function base64ToBytes(encoded) {
+    const binary = atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
   }
 
   function resetPreview() {

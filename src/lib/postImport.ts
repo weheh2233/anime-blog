@@ -61,8 +61,12 @@ export type PreparedPostImport = {
   files: PreparedFile[];
 };
 
-export type PersistedPostImport = Omit<PreparedPostImport, 'files'> & {
-  committedVia: 'local' | 'github';
+export type KeystaticDraftPayload = {
+  key: ['collection-create', 'posts'];
+  slug: string;
+  savedAt: string;
+  files: Array<[string, string]>;
+  createUrl: string;
 };
 
 class ImportError extends Error {
@@ -194,20 +198,17 @@ export async function preparePostImport(input: ImportInput): Promise<PreparedPos
   };
 }
 
-export async function persistPostImport(
+export async function createKeystaticDraftPayload(
   prepared: PreparedPostImport,
   options: { githubAccessToken?: string } = {},
-): Promise<PersistedPostImport> {
-  const committedVia = process.env.NODE_ENV === 'production' ? 'github' : 'local';
-
-  if (committedVia === 'github') {
-    await commitFilesToGitHub(prepared.files, `import post draft: ${prepared.slug}`, options.githubAccessToken);
-  } else {
-    await writeFilesLocally(prepared.files);
-  }
-
-  const { files: _files, ...result } = prepared;
-  return { ...result, committedVia };
+): Promise<KeystaticDraftPayload> {
+  return {
+    key: ['collection-create', 'posts'],
+    slug: prepared.slug,
+    savedAt: new Date().toISOString(),
+    files: prepared.files.map((file) => [file.repoPath, Buffer.from(file.data).toString('base64')]),
+    createUrl: await getKeystaticCreateUrl(options.githubAccessToken),
+  };
 }
 
 function buildMdoc(frontmatter: PreparedPostImport['frontmatter'], content: string): string {
@@ -218,15 +219,6 @@ function buildMdoc(frontmatter: PreparedPostImport['frontmatter'], content: stri
   }).trimEnd();
 
   return `---\n${dumped}\n---\n${content.trimStart()}\n`;
-}
-
-async function writeFilesLocally(files: PreparedFile[]) {
-  for (const file of files) {
-    const target = path.resolve(process.cwd(), file.repoPath);
-    assertWithinWorkspace(target);
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, file.data);
-  }
 }
 
 async function resolveUniqueSlug(baseSlug: string, githubAccessToken?: string): Promise<string> {
@@ -249,7 +241,7 @@ async function postExists(slug: string, githubAccessToken?: string): Promise<boo
     if (!token) {
       return false;
     }
-    const branch = process.env.BLOG_IMPORT_GITHUB_BRANCH || 'main';
+    const branch = await getTargetBranch(token);
     const res = await fetch(githubUrl(`/contents/${repoPath}?ref=${encodeURIComponent(branch)}`), {
       headers: githubHeaders(token),
     });
@@ -266,73 +258,6 @@ async function postExists(slug: string, githubAccessToken?: string): Promise<boo
   }
 }
 
-async function commitFilesToGitHub(files: PreparedFile[], message: string, githubAccessToken?: string) {
-  const token = githubAccessToken || process.env.BLOG_IMPORT_GITHUB_TOKEN;
-  const branch = process.env.BLOG_IMPORT_GITHUB_BRANCH || 'main';
-
-  if (!token) {
-    throw new ImportError('未找到可用于写入 GitHub 的登录凭据，请重新登录 Keystatic 后再导入。', 500);
-  }
-
-  const refRes = await githubFetch(token, `/git/ref/heads/${encodeURIComponent(branch)}`);
-  const ref = await refRes.json() as { object?: { sha?: string } };
-  const baseCommitSha = ref.object?.sha;
-  if (!baseCommitSha) throw new ImportError('无法读取 GitHub 分支引用。', 502);
-
-  const commitRes = await githubFetch(token, `/git/commits/${baseCommitSha}`);
-  const commit = await commitRes.json() as { tree?: { sha?: string } };
-  const baseTreeSha = commit.tree?.sha;
-  if (!baseTreeSha) throw new ImportError('无法读取 GitHub 基础 tree。', 502);
-
-  const tree = [];
-  for (const file of files) {
-    const blobRes = await githubFetch(token, '/git/blobs', {
-      method: 'POST',
-      body: JSON.stringify({
-        content: Buffer.from(file.data).toString('base64'),
-        encoding: 'base64',
-      }),
-    });
-    const blob = await blobRes.json() as { sha?: string };
-    if (!blob.sha) throw new ImportError(`创建 GitHub blob 失败：${file.repoPath}`, 502);
-    tree.push({
-      path: file.repoPath,
-      mode: '100644',
-      type: 'blob',
-      sha: blob.sha,
-    });
-  }
-
-  const treeRes = await githubFetch(token, '/git/trees', {
-    method: 'POST',
-    body: JSON.stringify({
-      base_tree: baseTreeSha,
-      tree,
-    }),
-  });
-  const newTree = await treeRes.json() as { sha?: string };
-  if (!newTree.sha) throw new ImportError('创建 GitHub tree 失败。', 502);
-
-  const newCommitRes = await githubFetch(token, '/git/commits', {
-    method: 'POST',
-    body: JSON.stringify({
-      message,
-      tree: newTree.sha,
-      parents: [baseCommitSha],
-    }),
-  });
-  const newCommit = await newCommitRes.json() as { sha?: string };
-  if (!newCommit.sha) throw new ImportError('创建 GitHub commit 失败。', 502);
-
-  await githubFetch(token, `/git/refs/heads/${encodeURIComponent(branch)}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      sha: newCommit.sha,
-      force: false,
-    }),
-  });
-}
-
 async function githubFetch(token: string, endpoint: string, init: RequestInit = {}) {
   const res = await fetch(githubUrl(endpoint), {
     ...init,
@@ -347,6 +272,26 @@ async function githubFetch(token: string, endpoint: string, init: RequestInit = 
   }
 
   return res;
+}
+
+async function getTargetBranch(token: string) {
+  if (process.env.BLOG_IMPORT_GITHUB_BRANCH) {
+    return process.env.BLOG_IMPORT_GITHUB_BRANCH;
+  }
+
+  const res = await githubFetch(token, '');
+  const repository = await res.json() as { default_branch?: string };
+  return repository.default_branch || 'master';
+}
+
+async function getKeystaticCreateUrl(githubAccessToken?: string) {
+  if (process.env.NODE_ENV !== 'production') {
+    return '/keystatic/collection/posts/create';
+  }
+
+  const token = githubAccessToken || process.env.BLOG_IMPORT_GITHUB_TOKEN;
+  const branch = token ? await getTargetBranch(token) : process.env.BLOG_IMPORT_GITHUB_BRANCH || 'master';
+  return `/keystatic/branch/${encodeURIComponent(branch)}/collection/posts/create`;
 }
 
 function githubUrl(endpoint: string) {
@@ -532,12 +477,4 @@ function decodeSafe(value: string) {
 
 function toRepoPath(...parts: string[]) {
   return parts.join('/').replace(/\\/g, '/').replace(/\/+/g, '/');
-}
-
-function assertWithinWorkspace(target: string) {
-  const root = process.cwd();
-  const relative = path.relative(root, target);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new ImportError('写入路径超出项目目录，已阻止导入。', 400);
-  }
 }
