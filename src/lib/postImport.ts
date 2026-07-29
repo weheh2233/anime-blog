@@ -21,6 +21,7 @@ export type ImportInput = {
   articleName: string;
   articleText: string;
   assets: UploadedAsset[];
+  githubAccessToken?: string;
   overrides?: {
     title?: string;
     description?: string;
@@ -114,7 +115,7 @@ export async function preparePostImport(input: ImportInput): Promise<PreparedPos
   const zone = normalizeZone(input.overrides?.zone || data.zone);
   const tags = normalizeTags(input.overrides?.tags ?? data.tags);
   const baseSlug = slugifyPostTitle(title || filenameWithoutExt(input.articleName));
-  const slug = await resolveUniqueSlug(baseSlug);
+  const slug = await resolveUniqueSlug(baseSlug, input.githubAccessToken);
   const assetIndex = createAssetIndex(input.assets);
   const missingImages = new Set<string>();
   const files: PreparedFile[] = [];
@@ -193,11 +194,14 @@ export async function preparePostImport(input: ImportInput): Promise<PreparedPos
   };
 }
 
-export async function persistPostImport(prepared: PreparedPostImport): Promise<PersistedPostImport> {
+export async function persistPostImport(
+  prepared: PreparedPostImport,
+  options: { githubAccessToken?: string } = {},
+): Promise<PersistedPostImport> {
   const committedVia = process.env.NODE_ENV === 'production' ? 'github' : 'local';
 
   if (committedVia === 'github') {
-    await commitFilesToGitHub(prepared.files, `import post draft: ${prepared.slug}`);
+    await commitFilesToGitHub(prepared.files, `import post draft: ${prepared.slug}`, options.githubAccessToken);
   } else {
     await writeFilesLocally(prepared.files);
   }
@@ -225,11 +229,11 @@ async function writeFilesLocally(files: PreparedFile[]) {
   }
 }
 
-async function resolveUniqueSlug(baseSlug: string): Promise<string> {
+async function resolveUniqueSlug(baseSlug: string, githubAccessToken?: string): Promise<string> {
   let slug = baseSlug;
   let suffix = 2;
 
-  while (await postExists(slug)) {
+  while (await postExists(slug, githubAccessToken)) {
     slug = `${baseSlug}-${suffix}`;
     suffix += 1;
   }
@@ -237,11 +241,11 @@ async function resolveUniqueSlug(baseSlug: string): Promise<string> {
   return slug;
 }
 
-async function postExists(slug: string): Promise<boolean> {
+async function postExists(slug: string, githubAccessToken?: string): Promise<boolean> {
   const repoPath = toRepoPath(POST_DIR, `${slug}.mdoc`);
 
   if (process.env.NODE_ENV === 'production') {
-    const token = process.env.BLOG_IMPORT_GITHUB_TOKEN;
+    const token = githubAccessToken || process.env.BLOG_IMPORT_GITHUB_TOKEN;
     if (!token) {
       return false;
     }
@@ -262,12 +266,12 @@ async function postExists(slug: string): Promise<boolean> {
   }
 }
 
-async function commitFilesToGitHub(files: PreparedFile[], message: string) {
-  const token = process.env.BLOG_IMPORT_GITHUB_TOKEN;
+async function commitFilesToGitHub(files: PreparedFile[], message: string, githubAccessToken?: string) {
+  const token = githubAccessToken || process.env.BLOG_IMPORT_GITHUB_TOKEN;
   const branch = process.env.BLOG_IMPORT_GITHUB_BRANCH || 'main';
 
   if (!token) {
-    throw new ImportError('生产环境未配置 BLOG_IMPORT_GITHUB_TOKEN，无法写入导入草稿。', 500);
+    throw new ImportError('未找到可用于写入 GitHub 的登录凭据，请重新登录 Keystatic 后再导入。', 500);
   }
 
   const refRes = await githubFetch(token, `/git/ref/heads/${encodeURIComponent(branch)}`);

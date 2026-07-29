@@ -5,14 +5,14 @@ import {
   preparePostImport,
   type UploadedAsset,
 } from '../../lib/postImport';
-import { hasKeystaticRepositoryAccess } from '../../lib/keystaticAuth';
+import { getKeystaticAccessToken, hasKeystaticRepositoryAccess } from '../../lib/keystaticAuth';
 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request }) => {
   try {
     const form = await request.formData();
-    await assertImportAccess(request, form.get('secret'));
+    const githubAccessToken = await assertImportAccess(request, form.get('secret'));
 
     const article = form.get('article');
     if (!(article instanceof File)) {
@@ -30,6 +30,7 @@ export const POST: APIRoute = async ({ request }) => {
       articleName: article.name,
       articleText: await article.text(),
       assets,
+      githubAccessToken,
       overrides: {
         title: getString(form.get('title')),
         description: getString(form.get('description')),
@@ -40,7 +41,7 @@ export const POST: APIRoute = async ({ request }) => {
       },
     });
 
-    const saved = await persistPostImport(prepared);
+    const saved = await persistPostImport(prepared, { githubAccessToken });
 
     return json({
       ok: true,
@@ -73,10 +74,11 @@ async function assertImportAccess(request: Request, value: FormDataEntryValue | 
       (error as Error & { status?: number }).status = 401;
       throw error;
     }
-    return;
+    return getKeystaticAccessToken(request);
   }
 
   assertSecret(value);
+  return undefined;
 }
 
 function assertSecret(value: FormDataEntryValue | null) {

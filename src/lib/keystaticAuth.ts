@@ -2,10 +2,14 @@ const KEYSTATIC_ACCESS_COOKIE = 'keystatic-gh-access-token';
 const REPOSITORY_OWNER = 'weheh2233';
 const REPOSITORY_NAME = 'anime-blog';
 
+export function getKeystaticAccessToken(request: Request): string | undefined {
+  return readCookie(request.headers.get('cookie'), KEYSTATIC_ACCESS_COOKIE);
+}
+
 export async function hasKeystaticRepositoryAccess(request: Request): Promise<boolean> {
   if (process.env.NODE_ENV !== 'production') return true;
 
-  const token = readCookie(request.headers.get('cookie'), KEYSTATIC_ACCESS_COOKIE);
+  const token = getKeystaticAccessToken(request);
   if (!token) return false;
 
   try {
