@@ -1,0 +1,1020 @@
+---
+title: FastAPI学习笔记
+description: fastapi学习笔记
+author: Kira
+publishDate: 2026-07-30
+zone: 编程
+tags:
+  - Python
+  - Fastapi
+draft: false
+pinned: false
+---
+# FastAPI 学习笔记
+
+fastapi官方中文文档：[[https://fastapi.tiangolo.com/zh/](https://fastapi.tiangolo.com/zh/)]
+
+> 学习项目：`D:\Pycharm\Pycharm_Projects\fastapi_study`\
+内容：路径参数、查询参数、请求体、Pydantic、响应模型、文件响应、中间件
+
+## 1. 创建和运行项目
+
+在 PyCharm 中可以创建普通的 `Pure Python` 项目，然后安装依赖：
+
+```bash
+pip install fastapi uvicorn
+```
+
+启动项目：
+
+```bash
+uvicorn main:app --reload
+```
+
+其中：
+
+```text
+main:app
+```
+
+表示：
+
+```text
+main.py 文件中的 app 对象
+```
+
+常用地址：
+
+```text
+http://127.0.0.1:8000
+http://127.0.0.1:8000/docs
+```
+
+`/docs` 是 FastAPI 自动生成的 Swagger 接口调试页面。
+
+---
+
+## 2. 最小 FastAPI 应用
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI()
+
+
+@app.get("/")
+def root():
+    return {"message": "Hello FastAPI"}
+```
+
+`@app.get("/")` 表示：
+
+```text
+使用 GET 请求访问 /
+```
+
+函数返回字典后，FastAPI 会自动把它转换成 JSON 响应。
+
+---
+
+## 3. HTTP 请求方法
+
+FastAPI 通过装饰器上的方法名区分不同类型的请求：
+
+{% table %}
+- 方法
+- 常见用途
+- 示例
+---
+- `GET`
+- 查询数据
+- 获取图书列表
+---
+- `POST`
+- 创建数据
+- 新增一本图书
+---
+- `PUT`
+- 完整更新数据
+- 替换一本图书的全部信息
+---
+- `PATCH`
+- 部分更新数据
+- 只修改图书价格
+---
+- `DELETE`
+- 删除数据
+- 删除一本图书
+{% /table %}
+
+### GET 查询
+
+```python
+@app.get("/books/{book_id}")
+async def get_book(book_id: int):
+    return {
+        "book_id": book_id,
+        "message": "查询图书"
+    }
+```
+
+访问：
+
+```text
+GET /books/1
+```
+
+### POST 新增
+
+```python
+class BookCreate(BaseModel):
+    title: str
+    price: float
+
+
+@app.post("/books")
+async def create_book(book: BookCreate):
+    return {
+        "message": "新增成功",
+        "book": book
+    }
+```
+
+请求 JSON：
+
+```json
+{
+  "title": "Python 入门",
+  "price": 29.9
+}
+```
+
+请求：
+
+```text
+POST /books
+```
+
+`POST` 通常用于创建资源，资源 ID 一般由后端生成。
+
+### PUT 完整更新
+
+```python
+class BookUpdate(BaseModel):
+    title: str
+    price: float
+
+
+@app.put("/books/{book_id}")
+async def update_book(book_id: int, book: BookUpdate):
+    return {
+        "message": "完整更新成功",
+        "book_id": book_id,
+        "book": book
+    }
+```
+
+请求 JSON：
+
+```json
+{
+  "title": "Python 进阶",
+  "price": 39.9
+}
+```
+
+请求：
+
+```text
+PUT /books/1
+```
+
+`PUT` 表示用新的完整对象替换旧对象。通常要求请求体提供完整字段。
+
+### PATCH 部分更新
+
+```python
+class BookPatch(BaseModel):
+    title: str | None = None
+    price: float | None = None
+
+
+@app.patch("/books/{book_id}")
+async def patch_book(book_id: int, book: BookPatch):
+    return {
+        "message": "部分更新成功",
+        "book_id": book_id,
+        "book": book
+    }
+```
+
+请求 JSON：
+
+```json
+{
+  "price": 49.9
+}
+```
+
+请求：
+
+```text
+PATCH /books/1
+```
+
+`PATCH` 只修改传入的字段，适合修改密码、价格、状态等单个或少量字段。
+
+如果使用 Pydantic 模型保存部分更新数据，可以通过：
+
+```python
+update_data = book.model_dump(exclude_unset=True)
+```
+
+只取用户真正传递的字段：
+
+```python
+@app.patch("/books/{book_id}")
+async def patch_book(book_id: int, book: BookPatch):
+    update_data = book.model_dump(exclude_unset=True)
+
+    return {
+        "book_id": book_id,
+        "update_data": update_data
+    }
+```
+
+例如用户只传：
+
+```json
+{
+  "price": 49.9
+}
+```
+
+那么 `update_data` 结果是：
+
+```python
+{"price": 49.9}
+```
+
+### DELETE 删除
+
+```python
+@app.delete("/books/{book_id}")
+async def delete_book(book_id: int):
+    return {
+        "message": "删除成功",
+        "book_id": book_id
+    }
+```
+
+请求：
+
+```text
+DELETE /books/1
+```
+
+实际项目中删除成功后常见返回：
+
+```python
+return {
+    "message": "删除成功"
+}
+```
+
+也可以返回 `204 No Content`：
+
+```python
+from fastapi import Response, status
+
+
+@app.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_book(book_id: int):
+    # 执行删除数据库记录的逻辑
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+```
+
+### 方法选择总结
+
+```text
+GET     查询，不应该修改数据
+POST    新增资源
+PUT     完整替换资源
+PATCH   部分修改资源
+DELETE  删除资源
+```
+
+REST 风格的图书接口通常可以设计成：
+
+```text
+GET     /books              查询图书列表
+POST    /books              新增图书
+GET     /books/{id}         查询一本图书
+PUT     /books/{id}         完整更新图书
+PATCH   /books/{id}         部分更新图书
+DELETE  /books/{id}         删除图书
+```
+
+---
+
+## 4. 路径参数 Path
+
+路径参数直接写在 URL 路径中：
+
+```python
+from fastapi import Path
+
+
+@app.get("/hello/{id}")
+async def hello(id: int = Path(..., gt=0, le=100)):
+    return {
+        "message": "Hello FastAPI",
+        "id": id
+    }
+```
+
+访问：
+
+```text
+http://127.0.0.1:8000/hello/10
+```
+
+### `Path` 参数说明
+
+```python
+Path(..., gt=0, le=100)
+```
+
+含义：
+
+```text
+...       必填
+gt=0      大于 0
+le=100    小于等于 100
+```
+
+因为 `id` 声明为 `int`，如果传入字符串或不符合范围，FastAPI 会自动返回参数校验错误。
+
+### Path 和 Query 的区别
+
+```text
+Path：用于定位具体资源
+例如：/user/1
+
+Query：用于分页、筛选、排序
+例如：/users?offset=0&limit=10
+```
+
+---
+
+## 4. 查询参数 Query
+
+查询参数位于 URL 的 `?` 后面：
+
+```python
+from fastapi import Query
+
+
+@app.get("/news/news_list")
+async def select_news(
+    offset: int = Query(0, ge=0, lt=10),
+    limit: int = 10
+):
+    print(f"这是第 {offset} 页，当前分页限制条数 {limit} 条")
+
+    return {
+        "offset": offset,
+        "limit": limit
+    }
+```
+
+访问：
+
+```text
+http://127.0.0.1:8000/news/news_list?offset=0&limit=10
+```
+
+这里：
+
+```python
+offset: int = Query(0, ge=0, lt=10)
+```
+
+表示：
+
+```text
+offset 类型是 int
+默认值是 0
+大于等于 0
+小于 10
+```
+
+分页参数一般使用 Query，不建议放在 Path 中：
+
+```python
+# 推荐
+/news/news_list?offset=0&limit=10
+
+# 不太适合分页
+/news/news_list/0
+```
+
+---
+
+## 5. 请求体 Body
+
+请求体通常用于 `POST`、`PUT`、`PATCH` 请求，数据一般使用 JSON。
+
+```python
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+
+class User(BaseModel):
+    username: str
+    password: str
+    address: str
+
+
+@app.post("/body")
+async def body(user: User):
+    print(user.username)
+    print(user.password)
+    print(user.address)
+
+    return user
+```
+
+请求 JSON：
+
+```json
+{
+  "username": "zhangsan",
+  "password": "12345678",
+  "address": "Beijing"
+}
+```
+
+### 为什么使用 POST
+
+`GET` 主要用于查询，通常不携带请求体。\
+提交一个完整的用户对象时，推荐使用：
+
+```python
+@app.post("/body")
+```
+
+而不是：
+
+```python
+@app.get("/body")
+```
+
+---
+
+## 6. Pydantic 嵌套模型
+
+地址也可以单独定义成一个模型：
+
+```python
+from pydantic import BaseModel, Field
+
+
+class Address(BaseModel):
+    city: str
+    zip_code: str
+
+
+class User(BaseModel):
+    username: str = Field(min_length=2, max_length=10)
+    password: str = Field(min_length=8, max_length=20)
+    address: Address
+```
+
+对应的请求 JSON：
+
+```json
+{
+  "username": "zhangsan",
+  "password": "12345678",
+  "address": {
+    "city": "Beijing",
+    "zip_code": "100000"
+  }
+}
+```
+
+### `Field` 校验
+
+```python
+username: str = Field(min_length=2, max_length=10)
+password: str = Field(min_length=8, max_length=20)
+```
+
+表示：
+
+```text
+username 长度 2 到 10
+password 长度 8 到 20
+```
+
+### 嵌套对象的属性访问
+
+```python
+print(user.username)
+print(user.password)
+print(user.address.city)
+print(user.address.zip_code)
+```
+
+直接打印嵌套对象：
+
+```python
+print(user.address)
+```
+
+可能显示为：
+
+```text
+city='Beijing' zip_code='100000'
+```
+
+这不是数据错误，而是 Pydantic 对象的 Python 字符串表示。
+
+如果想转换成字典：
+
+```python
+print(user.model_dump())
+```
+
+如果想转换成 JSON 字符串：
+
+```python
+print(user.model_dump_json())
+```
+
+---
+
+## 7. `response_model` 和返回值
+
+### 方式一：返回 Pydantic 对象
+
+```python
+@app.get("/book/{id}")
+async def book(id: int):
+    book = Book(index=id)
+    return book
+```
+
+### 方式二：声明 `response_model`，返回字典
+
+```python
+@app.get("/book/{id}", response_model=Book)
+async def book(id: int):
+    return {
+        "title": "",
+        "index": id,
+        "price": 0.0
+    }
+```
+
+两种方式都可以。
+
+`response_model` 的作用不只是把数据转成 JSON，还可以：
+
+```text
+校验响应数据
+生成 Swagger 文档
+过滤多余字段
+避免敏感字段返回给前端
+```
+
+例如：
+
+```python
+class UserInput(BaseModel):
+    username: str
+    password: str
+
+
+class UserOutput(BaseModel):
+    username: str
+
+
+@app.post("/user", response_model=UserOutput)
+async def create_user(user: UserInput):
+    return user
+```
+
+虽然返回的 `user` 里有密码，但最终响应只会保留 `username`。
+
+### `response_model` 和响应类型的区别
+
+```python
+async def get_book() -> Book:
+    ...
+```
+
+这是 Python 函数的返回类型标注。
+
+```python
+@app.get("/book", response_model=Book)
+```
+
+这是 FastAPI 对 HTTP 响应的约束和文档声明。
+
+实际项目中推荐明确写 `response_model`，特别是涉及用户、权限、密码等敏感数据时。
+
+---
+
+## 8. Pydantic 模型默认值
+
+项目中的 `Book` 可以这样定义：
+
+```python
+from pydantic import BaseModel
+
+
+class Book(BaseModel):
+    title: str = ""
+    index: int
+    price: float = 0.0
+```
+
+创建对象：
+
+```python
+book = Book(index=1)
+```
+
+结果相当于：
+
+```python
+{
+    "title": "",
+    "index": 1,
+    "price": 0.0
+}
+```
+
+Pydantic 模型一般不需要自己重写 `__init__`。\
+直接给字段设置默认值即可。
+
+不推荐：
+
+```python
+class Book(BaseModel):
+    title: str
+    index: int
+    price: float
+
+    def __init__(self, book_id: int):
+        ...
+```
+
+如果重写 `__init__`，可能影响 Pydantic 自带的字段校验和初始化逻辑。
+
+---
+
+## 9. 返回图片文件
+
+返回文件要使用 `FileResponse`：
+
+```python
+from fastapi.responses import FileResponse
+
+
+@app.get("/image/{id}")
+async def image(id: int):
+    path = f"./files/{id}.png"
+    return FileResponse(path)
+```
+
+访问：
+
+```text
+http://127.0.0.1:8000/image/1
+```
+
+它会查找：
+
+```text
+./files/1.png
+```
+
+### 注意：`*` 不会被 `FileResponse` 自动解析
+
+下面这样不行：
+
+```python
+path = f"./files/{id}.*"
+return FileResponse(path)
+```
+
+`FileResponse` 需要真实文件路径，不能直接处理通配符。
+
+如果要匹配任意后缀，需要先查找文件：
+
+```python
+from pathlib import Path
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
+
+
+@app.get("/image/{id}")
+async def image(id: int):
+    files = list(Path("./files").glob(f"{id}.*"))
+
+    if not files:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    return FileResponse(files[0])
+```
+
+### 不要把 `FileResponse` 写成 `response_model`
+
+错误或不必要的写法：
+
+```python
+@app.get("/image/{id}", response_model=FileResponse)
+```
+
+`response_model` 主要用于 Pydantic 数据模型。文件响应直接返回：
+
+```python
+return FileResponse(path)
+```
+
+---
+
+## 10. 中间件 Middleware
+
+中间件是所有请求都会经过的公共处理层，类似 Java 中的：
+
+```text
+Servlet Filter
+Spring HandlerInterceptor
+网关过滤器
+```
+
+基本写法：
+
+```python
+from fastapi import Request
+
+
+@app.middleware("http")
+async def middleware1(request: Request, call_next):
+    print("中间件1 start")
+
+    response = await call_next(request)
+
+    print("中间件1 end")
+    return response
+```
+
+`request` 和 `call_next` 都是 FastAPI/Starlette 自动传入的参数。
+
+其中：
+
+```python
+await call_next(request)
+```
+
+表示把请求继续交给下一个中间件或最终接口。
+
+它类似 Java 中的：
+
+```java
+chain.doFilter(request, response);
+```
+
+### 多个中间件的执行顺序
+
+```python
+@app.middleware("http")
+async def middleware1(request, call_next):
+    print("中间件1 start")
+    response = await call_next(request)
+    print("中间件1 end")
+    return response
+
+
+@app.middleware("http")
+async def middleware2(request, call_next):
+    print("中间件2 start")
+    response = await call_next(request)
+    print("中间件2 end")
+    return response
+```
+
+访问接口时通常是：
+
+```text
+中间件2 start
+中间件1 start
+接口执行
+中间件1 end
+中间件2 end
+```
+
+可以理解为：
+
+```text
+middleware2 start
+    middleware1 start
+        接口执行
+    middleware1 end
+middleware2 end
+```
+
+### 中间件的常见用途
+
+```text
+统一日志
+统计接口耗时
+添加请求 ID
+添加响应头
+统一鉴权
+限流
+CORS
+全局异常处理
+```
+
+例如统计接口耗时：
+
+```python
+import time
+from fastapi import Request
+
+
+@app.middleware("http")
+async def timer(request: Request, call_next):
+    start = time.time()
+
+    response = await call_next(request)
+
+    cost = time.time() - start
+    print(f"{request.url.path} 耗时：{cost:.3f} 秒")
+
+    return response
+```
+
+`call_next` 前面的代码是请求进入时执行，后面的代码是接口返回后执行。
+
+如果不调用：
+
+```python
+await call_next(request)
+```
+
+请求就不会继续到后面的接口。
+
+### 中间件和依赖注入的区别
+
+```text
+中间件：所有请求都会经过
+Depends：只有指定接口或路由会经过
+```
+
+适合放在中间件中的逻辑：
+
+```text
+全局日志、耗时、请求 ID、统一响应头
+```
+
+适合放在接口依赖中的逻辑：
+
+```text
+当前用户校验、某组接口的权限检查
+```
+
+不建议把具体订单、用户、数据库业务逻辑都塞进中间件。
+
+---
+
+## 11. 今天代码的一个完整整理版
+
+### `models.py`
+
+```python
+from pydantic import BaseModel, Field
+
+
+class Address(BaseModel):
+    city: str
+    zip_code: str
+
+
+class User(BaseModel):
+    username: str = Field(min_length=2, max_length=10)
+    password: str = Field(min_length=8, max_length=20)
+    address: Address
+
+
+class Book(BaseModel):
+    title: str = ""
+    index: int
+    price: float = 0.0
+```
+
+### `main.py`
+
+```python
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Path as FastAPIPath
+from fastapi import Query, Request
+from fastapi.responses import FileResponse
+
+from models import Address, Book, User
+
+app = FastAPI()
+
+
+@app.middleware("http")
+async def log_middleware(request: Request, call_next):
+    print("请求进入")
+    response = await call_next(request)
+    print("响应返回")
+    return response
+
+
+@app.get("/")
+async def root():
+    return {"message": "Hello FastAPI"}
+
+
+@app.get("/hello/{id}")
+async def hello(id: int = FastAPIPath(..., gt=0, le=100)):
+    return {
+        "message": "Hello FastAPI",
+        "id": id
+    }
+
+
+@app.get("/news/news_list")
+async def select_news(
+    offset: int = Query(0, ge=0, lt=10),
+    limit: int = 10
+):
+    return {
+        "offset": offset,
+        "limit": limit
+    }
+
+
+@app.post("/body", response_model=User)
+async def body(user: User):
+    print(
+        f"username={user.username}, "
+        f"password={user.password}, "
+        f"city={user.address.city}, "
+        f"zip_code={user.address.zip_code}"
+    )
+    return user
+
+
+@app.get("/image/{id}")
+async def image(id: int):
+    path = Path("./files") / f"{id}.png"
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="图片不存在")
+
+    return FileResponse(path)
+
+
+@app.get("/book/{id}", response_model=Book)
+async def book(id: int):
+    return Book(index=id)
+```
+
+---
+
+## 12. 今天最重要的记忆点
+
+```text
+Path：路径参数，例如 /user/{id}
+Query：查询参数，例如 ?offset=0&limit=10
+Body：请求体，通常配合 POST 和 Pydantic 模型
+Field：定义字段校验规则
+model_dump()：Pydantic 对象转字典
+response_model：约束响应结构、生成文档、过滤字段
+FileResponse：返回文件
+glob：匹配通配符文件
+Middleware：所有请求经过的公共处理层
+call_next：把请求继续交给后续流程
+```
+
+你今天已经从“能写接口”走到了“理解 FastAPI 请求处理链”的阶段。下一步可以继续学习：
+
+```text
+Depends 依赖注入
+APIRouter 路由拆分
+异常处理
+数据库连接
+JWT 登录认证
+```
