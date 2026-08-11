@@ -1,0 +1,730 @@
+---
+title: fastapi-orm
+description: fastapi增删改查和对接数据库的模板代码与笔记
+author: Kira
+publishDate: 2026-08-11
+zone: 编程
+tags:
+  - Python
+  - Fastapi
+draft: false
+pinned: false
+---
+# 我的 Python / FastAPI / ORM 笔记
+
+来源文件：`D:\Pycharm\Pycharm_Projects\fastapi_study\main.py`
+
+## 1. FastAPI 应用入口
+
+```python
+app = FastAPI(lifespan=lifespan)
+```
+
+含义：
+
+- 创建 FastAPI 应用对象。
+- `lifespan` 负责应用启动和关闭时执行的逻辑。
+- 类比 Java Spring Boot 的启动类。
+
+Java 类比：
+
+```text
+Spring Boot main 启动类 ≈ FastAPI 的 app = FastAPI(...)
+Controller 方法 ≈ @app.get / @app.post 装饰的函数
+```
+
+## 2. lifespan：替代 on_event
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await create_tables()
+    yield
+    await engine.dispose()
+```
+
+理解：
+
+- `yield` 前面：应用启动时执行。
+- `yield` 后面：应用关闭时执行。
+- `await create_tables()`：启动时建表。
+- `await engine.dispose()`：关闭时释放数据库连接资源。
+
+记忆：
+
+```text
+yield 前 = startup
+yield 后 = shutdown
+```
+
+## 3. 异步数据库连接
+
+```python
+ASYNC_DATABASE_URL = "mysql+aiomysql://root:1234@localhost:3306/fastapi_testDB"
+
+engine = create_async_engine(
+    ASYNC_DATABASE_URL,
+    echo=True,
+    pool_size=10,
+    max_overflow=20,
+)
+```
+
+含义：
+
+- `mysql+aiomysql`：使用 MySQL，并且使用异步驱动 `aiomysql`。
+- `root:1234`：数据库用户名和密码。
+- `localhost:3306`：MySQL 地址和端口。
+- `fastapi_testDB`：连接的数据库名。
+- `echo=True`：打印 SQL 日志，学习阶段很有用。
+- `pool_size=10`：连接池常驻连接数。
+- `max_overflow=20`：连接不够时允许临时多开 20 个。
+
+类比 Java：
+
+```text
+create_async_engine(...) ≈ DataSource / 数据库连接池
+```
+
+注意：
+
+```text
+create_all() 可以建表，但不能创建 MySQL 数据库本身。
+fastapi_testDB 这个库要先在 MySQL 里存在。
+```
+
+## 4. SessionLocal 和 get_session
+
+```python
+SessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+```
+
+含义：
+
+- `SessionLocal` 是 Session 工厂。
+- 每次请求都可以通过它创建一个 `AsyncSession`。
+- `expire_on_commit=False` 表示提交后对象属性不立刻过期，方便继续返回对象。
+
+```python
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with SessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+```
+
+含义：
+
+- `yield session`：把当前请求可用的数据库会话交给接口函数。
+- 出错时 `rollback()`：回滚事务。
+- 最后 `close()`：关闭 Session。
+
+类比 Java：
+
+```text
+AsyncSession ≈ EntityManager
+Depends(get_session) ≈ 给 Controller 注入 EntityManager
+```
+
+小坑：
+
+```python
+await create_tables()
+```
+
+不要放在 `get_session()` 里。否则每个请求都会尝试建表一次。\
+建表逻辑已经在 `lifespan()` 启动阶段执行一次就够。
+
+## 5. ORM 基类 Base
+
+```python
+class Base(DeclarativeBase):
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime,
+        insert_default=func.now(),
+        default=func.now(),
+        comment="创建时间",
+    )
+    update_time: Mapped[datetime] = mapped_column(
+        DateTime,
+        insert_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+        comment="更新时间",
+    )
+```
+
+含义：
+
+- `Base` 是所有 ORM 模型的父类。
+- 继承 `Base` 的类会被 SQLAlchemy 收集到 `Base.metadata`。
+- `create_time` 和 `update_time` 是所有表都继承的公共字段。
+
+关键字段：
+
+```text
+default=func.now()      插入时默认当前时间
+onupdate=func.now()     更新时自动刷新为当前时间
+comment="创建时间"       数据库字段注释
+```
+
+## 6. ORM 模型 Books
+
+```python
+class Books(Base):
+    __tablename__ = "books"
+
+    id: Mapped[int] = mapped_column(primary_key=True, comment="id")
+    bookname: Mapped[str] = mapped_column(String(255), comment="书籍名")
+    author: Mapped[str] = mapped_column(String(255), comment="作者")
+    price: Mapped[float] = mapped_column(Float, comment="价格")
+```
+
+含义：
+
+- `Books` 是 Python 类。
+- `books` 是数据库表名。
+- `id/bookname/author/price` 是表字段。
+
+类比 Java JPA：
+
+```text
+class Books(Base)              ≈ @Entity
+__tablename__ = "books"        ≈ @Table(name = "books")
+primary_key=True               ≈ @Id
+Mapped[str]                    ≈ 字段类型声明
+mapped_column(String(255))     ≈ @Column(length = 255)
+```
+
+## 7. create_tables：根据 ORM 模型建表
+
+```python
+async def create_tables() -> None:
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+```
+
+流程：
+
+```text
+Books 类定义
+-> Base.metadata 收集表结构
+-> create_all() 生成 CREATE TABLE SQL
+-> engine 连接数据库
+-> 数据库执行 SQL
+-> 表创建成功
+```
+
+重点：
+
+```python
+await conn.run_sync(Base.metadata.create_all)
+```
+
+`create_all()` 本身偏同步风格，所以在异步连接里要通过 `run_sync()` 执行。
+
+## 8. 中间件 middleware
+
+```python
+@app.middleware("http")
+async def middleware(request, call_next):
+    print("中间件1start")
+    response = await call_next(request)
+    print("中间件1end")
+    return response
+```
+
+含义：
+
+- 请求进来时先经过中间件。
+- `await call_next(request)` 表示继续交给后面的路由处理。
+- 路由处理完后，再回到中间件继续执行。
+
+执行感觉：
+
+```text
+请求进入
+-> 中间件 start
+-> 路由函数
+-> 中间件 end
+-> 返回响应
+```
+
+类比 Java：
+
+```text
+FastAPI middleware ≈ Filter / Interceptor
+```
+
+## 9. 路径参数 Path
+
+```python
+@app.get("/hello/{id}")
+async def hello(id: int = Path(..., gt=0, le=100)):
+    return {"id": id}
+```
+
+含义：
+
+- `/hello/{id}` 中的 `{id}` 是路径参数。
+- `id: int` 表示自动转成整数。
+- `Path(..., gt=0, le=100)` 表示：
+  - 必填。
+  - 大于 0。
+  - 小于等于 100。
+
+类比 Java：
+
+```text
+@PathVariable Integer id
+```
+
+## 10. 查询参数 Query
+
+```python
+@app.get("/news/news_list")
+async def select_news(
+    offset: int = Query(0, ge=0, lt=10),
+    limit: int = 10,
+):
+    return {"offset": offset, "limit": limit}
+```
+
+访问：
+
+```text
+/news/news_list?offset=1&limit=10
+```
+
+含义：
+
+- `offset` 默认值是 0。
+- `offset >= 0`。
+- `offset < 10`。
+- `limit` 默认值是 10。
+
+类比 Java：
+
+```text
+@RequestParam(defaultValue = "0") Integer offset
+```
+
+## 11. 请求体和 response_model
+
+```python
+@app.post("/body", response_model=User)
+async def body(user: User):
+    return user
+```
+
+含义：
+
+- `user: User` 表示请求体 JSON 会被解析成 `User` 对象。
+- `response_model=User` 表示返回值按 `User` 的结构输出。
+- FastAPI 会自动做参数校验和 JSON 序列化。
+
+类比 Java：
+
+```text
+user: User         ≈ @RequestBody User user
+response_model    ≈ 响应 DTO
+```
+
+## 12. 文件响应 FileResponse
+
+```python
+@app.get("/image/{id}")
+async def image(id: int):
+    path = f"./files/{id}.png"
+    return FileResponse(path)
+```
+
+含义：
+
+- 根据路径返回一个文件。
+- 这里访问 `/image/1` 时，会返回 `./files/1.png`。
+
+## 13. 增：Create
+
+```python
+@app.post("/books/{bookname}")
+async def create_book(
+    bookname: str,
+    author: str,
+    price: float,
+    session: AsyncSession = Depends(get_session),
+):
+    book = Books(
+        bookname=bookname,
+        author=author,
+        price=price,
+    )
+    session.add(book)
+    await session.commit()
+    await session.refresh(book)
+    return book
+```
+
+流程：
+
+```text
+1. 创建 Books 对象
+2. session.add(book)：放进待保存队列
+3. commit()：真正写入数据库
+4. refresh(book)：把数据库生成的 id、时间等刷新回来
+5. return book：返回保存后的对象
+```
+
+对应 SQL 思维：
+
+```sql
+INSERT INTO books (bookname, author, price)
+VALUES (...);
+```
+
+## 14. 删：Delete
+
+```python
+@app.delete("/books/{id}")
+async def delete_book(
+    id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    book = await session.get(Books, id)
+
+    if book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    await session.delete(book)
+    await session.commit()
+
+    return {"message": "deleted", "id": id}
+```
+
+流程：
+
+```text
+1. 先按 id 查询
+2. 查不到就返回 404
+3. 查到就 delete
+4. commit 提交删除
+```
+
+口诀：
+
+```text
+删 = 先查 -> 再删 -> 再提交
+```
+
+## 15. 改：Update
+
+```python
+@app.put("/books/{book_id}")
+async def update_book(
+    book_id: int,
+    bookname: str,
+    author: str,
+    price: float,
+    session: AsyncSession = Depends(get_session),
+):
+    book = await session.get(Books, book_id)
+
+    if book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    book.bookname = bookname
+    book.author = author
+    book.price = price
+
+    await session.commit()
+    await session.refresh(book)
+
+    return book
+```
+
+流程：
+
+```text
+1. 先查出旧对象
+2. 修改对象属性
+3. commit 时 ORM 自动生成 UPDATE
+4. refresh 后返回最新对象
+```
+
+对应 SQL 思维：
+
+```sql
+UPDATE books
+SET bookname = ..., author = ..., price = ...
+WHERE id = ...;
+```
+
+## 16. 查单个 id：Read One
+
+当前代码写法：
+
+```python
+@app.get("/books/{id}")
+async def get_books_list(
+    id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    books = await session.execute(
+        select(Books).where(Books.id == id)
+    )
+    return books.scalars().all()
+```
+
+含义：
+
+- `select(Books)`：查询 `books` 表。
+- `.where(Books.id == id)`：筛选指定 id。
+- `execute(stmt)`：执行 SQL。
+- `scalars()`：只拿 ORM 对象，不拿整行包装。
+- `all()`：返回列表。
+
+更推荐的主键查询写法：
+
+```python
+@app.get("/books/{id}")
+async def get_book(
+    id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    book = await session.get(Books, id)
+
+    if book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    return book
+```
+
+区别：
+
+```text
+session.get(Books, id)                    返回单个对象或 None
+select(...).where(...).scalars().all()    返回列表
+```
+
+## 17. 模糊查询
+
+```python
+@app.get("/books/search")
+async def search_books(
+    keyword: str,
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.execute(
+        select(Books).where(Books.bookname.like(f"%{keyword}%"))
+    )
+
+    return result.scalars().all()
+```
+
+含义：
+
+```text
+Books.bookname.like(f"%{keyword}%")
+```
+
+等价 SQL：
+
+```sql
+WHERE bookname LIKE '%关键词%'
+```
+
+常用查询写法：
+
+```python
+Books.author == "刘慈欣"          # 完全匹配
+Books.author.like("%刘%")        # 模糊匹配
+or_(条件1, 条件2)                # 多个条件或
+and_(条件1, 条件2)               # 多个条件且
+```
+
+## 18. 这份代码里的几个重要改进点
+
+### 18.1 不要每次请求都建表
+
+当前 `get_session()` 里有：
+
+```python
+await create_tables()
+```
+
+建议删掉。建表放在 `lifespan()` 里启动时执行一次就够。
+
+正确：
+
+```python
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with SessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+```
+
+### 18.2 `/books/search` 要放在 `/books/{id}` 前面
+
+当前有：
+
+```python
+@app.get("/books/{id}")
+```
+
+和：
+
+```python
+@app.get("/books/search")
+```
+
+如果 `/books/{id}` 写在 `/books/search` 前面，访问 `/books/search` 时可能会先匹配到 `{id}`，然后因为 `"search"` 不是整数导致报错。
+
+建议顺序：
+
+```python
+@app.get("/books/search")
+async def search_books(...):
+    ...
+
+@app.get("/books/{id}")
+async def get_book(...):
+    ...
+```
+
+### 18.3 `response_model=Book` 可能不匹配 ORM 返回对象
+
+当前新增接口：
+
+```python
+@app.post("/books/{bookname}", response_model=Book)
+```
+
+但返回的是：
+
+```python
+return book
+```
+
+这里的 `book` 是 ORM 的 `Books` 对象。\
+如果 `models.Book` 只是：
+
+```python
+class Book(BaseModel):
+    index: int
+```
+
+那就和 `Books` 的字段不匹配。
+
+建议定义专门的响应 DTO：
+
+```python
+class BookRead(BaseModel):
+    id: int
+    bookname: str
+    author: str
+    price: float
+```
+
+然后：
+
+```python
+@app.post("/books/{bookname}", response_model=BookRead)
+```
+
+### 18.4 增加接口更适合用请求体
+
+当前新增接口是：
+
+```python
+@app.post("/books/{bookname}")
+async def create_book(bookname: str, author: str, price: float, ...):
+```
+
+这样 `bookname` 是路径参数，`author` 和 `price` 是查询参数。
+
+更像真实项目的写法：
+
+```python
+class BookCreate(BaseModel):
+    bookname: str
+    author: str
+    price: float
+
+
+@app.post("/books")
+async def create_book(
+    data: BookCreate,
+    session: AsyncSession = Depends(get_session),
+):
+    book = Books(**data.model_dump())
+    session.add(book)
+    await session.commit()
+    await session.refresh(book)
+    return book
+```
+
+请求 JSON：
+
+```json
+{
+  "bookname": "三体",
+  "author": "刘慈欣",
+  "price": 59.0
+}
+```
+
+## 19. CRUD 总口诀
+
+```text
+增：new 对象 -> add -> commit -> refresh
+查单个：session.get(Model, id)
+查多个：execute(select(Model).where(...)) -> scalars().all()
+改：get -> 改字段 -> commit -> refresh
+删：get -> delete -> commit
+```
+
+Java 对照：
+
+```text
+Books                  ≈ Entity
+AsyncSession           ≈ EntityManager
+session.add(book)      ≈ persist / save
+session.get(Books, id) ≈ findById
+select(...).where(...) ≈ JPQL / Criteria
+commit                 ≈ 提交事务
+delete                 ≈ remove / delete
+```
+
+## 20. 进入 LangChain 前要掌握的最小 FastAPI 能力
+
+你这份代码已经覆盖了进入 LangChain 前最重要的东西：
+
+- 会写 `app = FastAPI(...)`。
+- 会写 `@app.get` / `@app.post` / `@app.put` / `@app.delete`。
+- 会用 `Path` 和 `Query`。
+- 会用 Pydantic 模型处理请求体和响应体。
+- 会用 `Depends(get_session)` 注入数据库 Session。
+- 会理解 `async def` 和 `await`。
+- 会写 ORM 增删改查。
+
+下一步学 LangChain 时，只需要把某个接口里的业务逻辑换成：
+
+```python
+answer = await chain.ainvoke(req.message)
+return {"answer": answer}
+```
+
+FastAPI 对 LangChain 来说，就是一个 HTTP 外壳。
