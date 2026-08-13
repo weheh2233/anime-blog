@@ -1,0 +1,743 @@
+---
+title: SSE与项目实际常用实现（Reactor架构、AI流式输出）
+description: >-
+  这不是 SSE 单独的标准模板，而是“Spring SSE + Reactor AI 流 +
+  数据库消息状态机（项目中的，通过事务钩子先提交标识ai消息表的新信息为生成状态，写入数据表（因为由@Translation开启事务也能事务回撤）后续生成完成后再回调函数更新db为完成状态）”的常见工程实现。
+author: Kira
+publishDate: 2026-08-13
+zone: 编程
+tags:
+  - sse
+  - java
+draft: false
+pinned: false
+---
+> SSE 只负责“把服务端产生的数据持续发送给前端”；它不负责产生 AI 内容，也不负责保存聊天记录。
+
+当前代码其实是三层拼在一起：
+
+```
+AI 模型流
+    ↓
+Reactor Flux<String>
+    ↓
+SseEmitter
+    ↓
+浏览器前端
+```
+
+数据库则在旁边负责保存业务状态：
+
+```
+用户消息、助手消息、GENERATING、COMPLETED、FAILED
+```
+
+## 1. 普通接口和流式接口的区别
+
+普通接口一般是：
+
+```
+String answer = chatClient.prompt()
+        .user(question)
+        .call()
+        .content();
+
+return Result.success(answer);
+```
+
+执行过程：
+
+```
+请求进入
+  ↓
+等待模型完整生成
+  ↓
+返回完整答案
+  ↓
+HTTP 连接结束
+```
+
+用户要等模型完整生成后才能看到答案。
+
+流式接口则是：
+
+```
+Flux<String> answerStream = chatClient.prompt()
+        .user(question)
+        .stream()
+        .content();
+```
+
+模型可能陆续返回：
+
+```
+片段1：这个商品
+片段2：最大的风险是
+片段3：相关资料不足。
+```
+
+服务端拿到一个片段，就马上转发一个片段：
+
+```
+模型片段1 → SSE → 前端
+模型片段2 → SSE → 前端
+模型片段3 → SSE → 前端
+```
+
+所以流式的本质不是“多次调用接口”，而是：
+
+> 一次请求建立一个暂时不关闭的响应，服务端持续往这个响应里写数据。
+
+## 2. `SseEmitter` 是什么
+
+```
+SseEmitter emitter = new SseEmitter(180_000L);
+```
+
+`SseEmitter` 可以理解为：
+
+> 一个已经交给 Spring 管理的“持续响应发送器”。
+
+普通 Controller 返回对象：
+
+```
+public Result<String> send() {
+    return Result.success("回答");
+}
+```
+
+Spring 会把对象序列化成 JSON，然后结束 HTTP 请求。
+
+而返回 `SseEmitter`：
+
+```
+public SseEmitter send() {
+    SseEmitter emitter = new SseEmitter();
+    return emitter;
+}
+```
+
+Spring 不会马上关闭响应。之后服务端可以继续调用：
+
+```
+emitter.send(...);
+```
+
+向同一个浏览器连接发送多次事件。
+
+最后调用：
+
+```
+emitter.complete();
+```
+
+才表示这次响应真正结束。
+
+因此，SSE 最核心的三个动作就是：
+
+```
+创建 SseEmitter
+emitter.send(...)
+emitter.complete()
+```
+
+## 3. `sendEvent` 做了什么
+
+当前代码把发送事件统一封装成：
+
+```
+private void sendEvent(
+        SseEmitter emitter,
+        String name,
+        Map<String, ?> data
+) {
+    emitter.send(
+        SseEmitter.event()
+                .name(name)
+                .data(data, MediaType.APPLICATION_JSON)
+    );
+}
+```
+
+例如：
+
+```
+sendEvent(
+    emitter,
+    "text_delta",
+    Map.of("content", "这个商品的主要风险是")
+);
+```
+
+浏览器实际收到的内容大概是：
+
+```
+event: text_delta
+data: {"content":"这个商品的主要风险是"}
+```
+
+这里：
+
+- `event` 是事件名称。
+- `data` 是事件数据。
+- 每次 `send()` 都是一条独立事件。
+- `complete()` 表示整个事件流结束。
+
+## 4. 为什么先发送 `status`
+
+模型生成可能需要几秒甚至几十秒。如果后端什么都不发，前端会处于这种状态：
+
+```
+用户点击发送
+  ↓
+页面没有变化
+  ↓
+用户不知道是处理中、网络卡住，还是请求失败
+```
+
+因此先发：
+
+```
+sendEvent(
+    emitter,
+    "status",
+    Map.of(
+        "phase", "thinking",
+        "message", "正在结合分析结果理解问题"
+    )
+);
+```
+
+前端收到后可以显示：
+
+```
+正在思考...
+```
+
+完整事件一般是：
+
+```
+status
+  ↓
+text_delta
+  ↓
+text_delta
+  ↓
+text_delta
+  ↓
+done
+```
+
+`status` 是业务层事件，不是 SSE 协议强制要求的事件。你完全可以不用它，但用户体验会更差。
+
+## 5. `Flux<String>` 和 SSE 的关系
+
+Spring AI 的：
+
+```
+.stream()
+.content()
+```
+
+返回的是 Reactor 的：
+
+```
+Flux<String>
+```
+
+`Flux` 表示一个异步数据流。它可以理解为：
+
+```
+未来会产生 0 个、1 个或很多个字符串
+```
+
+服务端通过：
+
+```
+.subscribe(
+    chunk -> { ... },
+    error -> { ... },
+    () -> { ... }
+);
+```
+
+订阅这个流。
+
+三个回调含义：
+
+```
+chunk -> ...
+```
+
+每产生一个文本片段，就执行一次。
+
+```
+error -> ...
+```
+
+模型调用失败，执行一次。
+
+```
+() -> ...
+```
+
+模型正常生成完毕，执行一次。
+
+当前代码的桥接过程就是：
+
+```
+analysisSessionChatClient.prompt()
+        .system(systemPrompt)
+        .user(userPrompt)
+        .stream()
+        .content()
+        .subscribe(
+                chunk -> {
+                    answer.append(chunk);
+
+                    sendEvent(
+                        emitter,
+                        "text_delta",
+                        Map.of("content", chunk)
+                    );
+                },
+                error -> failGeneration(...),
+                () -> completeGeneration(...)
+        );
+```
+
+这段代码做了两件事：
+
+```
+Flux 每产生一个 chunk
+  ├─ 追加到 StringBuilder
+  └─ 通过 SSE 发给前端
+```
+
+所以：
+
+> Reactor `Flux` 是模型数据流，SSE 是浏览器接收数据流的通道。
+
+两者不是同一个东西。
+
+## 6. `StringBuilder` 为什么需要
+
+假设模型产生：
+
+```
+chunk 1: "这个商品"
+chunk 2: "最大的风险是"
+chunk 3: "资料不足。"
+```
+
+前端需要立刻显示，所以每个 chunk 都马上发送。
+
+但是数据库最终需要保存完整答案：
+
+```
+这个商品最大的风险是资料不足。
+```
+
+因此后端同时做：
+
+```
+StringBuilder answer = new StringBuilder();
+
+chunk -> {
+    answer.append(chunk);
+
+    sendEvent(
+        emitter,
+        "text_delta",
+        Map.of("content", chunk)
+    );
+}
+```
+
+流结束时：
+
+```
+assistantMessage.setContent(answer.toString());
+assistantMessage.setStatus("COMPLETED");
+messageMapper.updateResult(assistantMessage);
+```
+
+所以 `StringBuilder` 的作用是：
+
+```
+实时发送：依赖每个 chunk
+完整落库：依赖所有 chunk 拼起来的结果
+```
+
+如果不需要保存完整答案，就可以不使用 `StringBuilder`。但聊天历史通常需要完整答案，所以它很常见。
+
+## 7. `Disposable` 是干什么的
+
+`subscribe()` 会返回一个订阅对象：
+
+```
+Disposable disposable = flux.subscribe(...);
+```
+
+这个对象代表：
+
+> 当前服务端正在订阅模型数据流。
+
+保存它：
+
+```
+AtomicReference<Disposable> subscription =
+        new AtomicReference<>();
+```
+
+订阅后放进去：
+
+```
+Disposable disposable = flux.subscribe(...);
+subscription.set(disposable);
+```
+
+之后如果 SSE 超时或浏览器断开，就可以：
+
+```
+Disposable disposable = subscription.get();
+
+if (disposable != null) {
+    disposable.dispose();
+}
+```
+
+这相当于取消模型流。
+
+否则可能发生：
+
+```
+浏览器已经断开
+  ↓
+SSE 已经无法发送
+  ↓
+模型仍然继续生成
+  ↓
+服务端还在消耗 CPU、连接和模型额度
+```
+
+所以 `Disposable` 不是 SSE 必须的，而是 Reactor 异步流的取消控制器。
+
+## 8. 为什么使用 `AtomicReference`
+
+因为 `generate()` 里有多个异步回调：
+
+```
+模型 onNext
+模型 onError
+模型 onComplete
+SSE onTimeout
+SSE onError
+```
+
+这些回调可能在不同线程执行。
+
+`Disposable` 是稍后才创建的，但超时回调可能先注册，甚至先触发。因此需要一个线程安全的容器，让不同回调都能访问同一个订阅对象：
+
+```
+AtomicReference<Disposable> subscription =
+        new AtomicReference<>();
+```
+
+它不是用来保存多个订阅，而是保存当前这一条模型流的订阅句柄。
+
+## 9. `onTimeout` 处理什么
+
+```
+emitter.onTimeout(() -> {
+    Disposable disposable = subscription.get();
+
+    if (disposable != null) {
+        disposable.dispose();
+    }
+
+    failGeneration(
+        emitter,
+        assistantMessage,
+        answer.toString(),
+        "回复生成超时，请重试",
+        finished
+    );
+});
+```
+
+当前超时设置是：
+
+```
+new SseEmitter(180_000L)
+```
+
+也就是3分钟。
+
+触发后：
+
+```
+SSE 请求超时
+  ↓
+取消模型订阅
+  ↓
+保存已生成的部分文本
+  ↓
+助手消息改为 FAILED
+  ↓
+发送 error
+  ↓
+关闭 SSE
+```
+
+注意：
+
+> `onTimeout` 是服务端认为这次请求等待太久，不一定是浏览器主动断开。
+
+## 10. `onError` 处理什么
+
+```
+emitter.onError(error -> {
+    Disposable disposable = subscription.get();
+
+    if (disposable != null) {
+        disposable.dispose();
+    }
+
+    failGeneration(
+        emitter,
+        assistantMessage,
+        answer.toString(),
+        "连接已中断，请重试",
+        finished
+    );
+});
+```
+
+它主要处理 SSE 响应出错，例如：
+
+- 浏览器连接断开。
+- 网络异常。
+- 服务端向客户端写数据失败。
+- 异步请求执行错误。
+
+这里的业务处理不是简单打印日志，而是要把数据库状态同步更新：
+
+```
+GENERATING → FAILED
+```
+
+否则刷新历史时，前端可能永远看到：
+
+```
+助手正在生成
+```
+
+实际上生成早就已经失败了。
+
+## 11. 为什么要有 `AtomicBoolean finished`
+
+一条请求可能同时遇到多个结束信号：
+
+```
+模型正常完成
+SSE 超时
+网络断开
+模型报错
+```
+
+如果没有保护，可能发生：
+
+```
+先写 COMPLETED
+随后又写 FAILED
+或者：
+先发送 done
+随后又发送 error
+```
+
+因此使用：
+
+```
+AtomicBoolean finished = new AtomicBoolean(false);
+```
+
+完成时：
+
+```
+if (!finished.compareAndSet(false, true)) {
+    return;
+}
+```
+
+失败时同样：
+
+```
+if (!finished.compareAndSet(false, true)) {
+    return;
+}
+```
+
+`compareAndSet(false, true)` 的含义是：
+
+```
+只有当前状态还是 false 的第一个回调，
+才有资格把它改成 true 并结束任务。
+```
+
+其他回调发现已经是 `true`，直接返回。
+
+这属于异步任务的幂等收尾控制，不是 SSE 专属，但 SSE + AI 流式场景非常需要。
+
+## 12. `done` 代表什么
+
+模型流正常结束时：
+
+```
+assistantMessage.setContent(content);
+assistantMessage.setStatus("COMPLETED");
+messageMapper.updateResult(assistantMessage);
+
+sendEvent(
+    emitter,
+    "done",
+    Map.of("messageId", assistantMessage.getMessageId())
+);
+
+emitter.complete();
+```
+
+注意顺序：
+
+```
+先更新数据库
+  ↓
+再告诉前端 done
+  ↓
+再关闭 SSE
+```
+
+这样前端收到 `done` 时，理论上数据库已经有完整助手消息了。
+
+`done` 事件不负责传完整文本，因为文本已经通过多个 `text_delta` 发出。它主要告诉前端：
+
+```
+这条助手消息已经完成
+messageId 是多少
+```
+
+## 13. 数据库和 SSE 是两条并行职责
+
+发送消息时，先在事务中写：
+
+```
+USER: COMPLETED
+ASSISTANT: GENERATING
+```
+
+事务提交后才调用模型。
+
+模型生成期间：
+
+```
+SSE：持续把片段发给前端
+数据库：助手消息仍然是 GENERATING
+```
+
+模型完成后：
+
+```
+数据库：GENERATING → COMPLETED
+SSE：发送 done
+```
+
+失败时：
+
+```
+数据库：GENERATING → FAILED
+SSE：发送 error
+```
+
+因此：
+
+> SSE 负责实时体验，数据库负责最终事实。
+
+不能把 SSE 当成聊天记录存储，因为：
+
+- 浏览器可能刷新。
+- 网络可能断开。
+- 前端可能没有收到最后一段。
+- 服务端可能在生成过程中重启。
+
+历史必须从 MySQL 恢复。
+
+## 14. 一次完整请求的时序
+
+```
+前端                          后端                         模型
+ |                             |                            |
+ | POST 问题 ----------------->|                            |
+ |                             | 校验登录/VIP/会话           |
+ |                             | 写 USER                     |
+ |                             | 写 ASSISTANT GENERATING    |
+ |                             | 提交事务                    |
+ |<--------- HTTP 连接保持 -----|                            |
+ |                             | 发送 status                |
+ |<--------- status ------------|                            |
+ |                             |--------------------------->| 开始生成
+ |                             |<---------------------------| chunk 1
+ |<------ text_delta ----------|                            |
+ |                             |<---------------------------| chunk 2
+ |<------ text_delta ----------|                            |
+ |                             |<---------------------------| chunk 3
+ |<------ text_delta ----------|                            |
+ |                             | 更新 COMPLETED              |
+ |<----------- done ------------|                            |
+ |                             | 关闭 SSE                   |
+```
+
+用户下一次提问时，才会再次调用一次 `send`。同一条回答过程中，助手不会再次调用 `send`。
+
+## 15. 这套模式中哪些是“经典 SSE”，哪些是“业务代码”
+
+可以分成三组：
+
+### SSE 核心
+
+```
+SseEmitter
+emitter.send(...)
+emitter.complete()
+```
+
+负责 HTTP 流式传输。
+
+### AI/Reactor 适配
+
+```
+Flux<String>
+subscribe(...)
+Disposable
+StringBuilder
+```
+
+负责接收模型增量输出、取消模型任务、拼完整文本。
+
+### 业务可靠性
+
+```
+GENERATING
+COMPLETED
+FAILED
+clientRequestId
+AtomicBoolean finished
+messageMapper.updateResult(...)
+```
+
+负责持久化、幂等、失败恢复和防止重复收尾。
+
+所以完整准确的说法是：
+
+> 这不是 SSE 单独的标准模板，而是“Spring SSE + Reactor AI 流 + 数据库消息状态机”的常见工程实现。
+
+SSE 本身很简单；真正复杂的是围绕它处理模型生成、断线、超时、重复请求和数据库一致性。
