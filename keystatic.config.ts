@@ -1,4 +1,5 @@
 import { config, collection, singleton, fields } from '@keystatic/core';
+import React from 'react';
 import { SITE } from './src/consts';
 
 const ZONES = [
@@ -11,6 +12,33 @@ const ZONES = [
 ];
 
 export default config({
+  ui: {
+    brand: {
+      name: 'Anime Blog',
+      mark: () => React.createElement('a', {
+        href: '/',
+        'aria-label': '返回首页',
+        title: '返回首页',
+        style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.35rem',
+          color: 'inherit',
+          textDecoration: 'none',
+          fontSize: '0.9rem',
+          fontWeight: 600,
+          whiteSpace: 'nowrap',
+          padding: '0.45rem 0.75rem',
+          border: '1px solid currentColor',
+          borderRadius: '0.5rem',
+        },
+      }, '⌂ 返回首页'),
+    },
+    navigation: {
+      内容: ['posts', '---', 'music', 'siteBackgrounds'],
+      设置: ['siteSettings'],
+    },
+  },
   storage: process.env.NODE_ENV === 'production'
     ? {
         kind: 'github',

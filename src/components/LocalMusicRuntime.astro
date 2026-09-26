@@ -142,10 +142,6 @@ import { LOCAL_MUSIC } from '../lib/localMusic';
   bootLocalMusic();
   document.addEventListener('astro:page-load', bootLocalMusic);
 
-  // Splash animation: 5000ms, then 500ms fade-out.
-  window.setTimeout(() => {
-    if (window.__musicPlayer) void window.__musicPlayer.play();
-  }, 5500);
 </script>
 
 <style>
