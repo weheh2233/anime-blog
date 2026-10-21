@@ -1,0 +1,185 @@
+---
+title: DSH草稿修复排查笔记
+description: >-
+  由真实需求引出的dsh的bug修复
+
+  记录一次从「找不到问题」到「定位根因」的全过程。真实时间跨度约 4 小时，其中前 2 小时全在错误的方向上。
+  价值不在结论，在于那些被推翻的假设是怎么被推翻的。
+author: Kira
+publishDate: 2026-10-21
+zone: 编程
+tags:
+  - deepseekHarness
+draft: true
+pinned: true
+---
+# DSH 新对话草稿丢失：一次完整的排查记录
+
+> 记录一次从「找不到问题」到「定位根因」的全过程。真实时间跨度约 4 小时，其中前 2 小时全在错误的方向上。
+价值不在结论，在于那些被推翻的假设是怎么被推翻的。
+
+## 一、现象
+
+在 DSH 里点「新对话」，输入一段文字，然后切到别的对话，再点「新对话」——输入的内容没了。
+
+对照组：Codex 不会丢。它只有一个「未发送消息」槽，切换项目时只改 workspace 归属，内容保留。
+
+## 二、第一个假设（错的）
+
+**假设：新对话没有 sessionId，所以读不到草稿。**
+
+推断链：草稿按 `dsh.conversation.<sessionId>` 存储；如果新对话没有 id，那 key 就拼不出来。
+
+于是动手改 `readConversationDraft(sessionId: SessionId)`，让它接受 `null`，`null` 时读一个固定 key
+`dsh.conversation.__pending__`。改完加了一行日志：
+
+```ts
+console.log('读取草稿 sessionId:', sessionId)
+```
+
+**测试结果：点「新对话」，控制台一条日志都没有。**
+
+这一步很关键——不是「结果不对」，是「代码根本没跑」。函数没被调用，说明我的心智模型整个错了：
+我以为新对话的入口会走这个函数，实际上根本没走到。
+
+## 三、第二个假设（也是错的）
+
+**假设：新对话是纯 UI 状态，压根没被物化成 session，所以不走任何 session 路径。**
+
+这个假设听起来很合理——侧边栏那个「新会话」条目切走就消失、回来又重新出现，确实很像临时状态。
+差点就沿着「去找 UI 层怎么管理临时状态」这条路走远。
+
+转折点是 grep 出来的：`readConversationDraft` 只有一处调用，在
+`packages/client/ui-conversation/src/client/input/hub.ts` 的 `shellFor()` 里：
+
+```ts
+shell.setDraft(readConversationDraft(binding.sessionId))
+```
+
+它确实被调用，参数是 `binding.sessionId`——**新对话是有真实 sessionId 的**。
+
+## 四、真相：每次都是新的 UUID
+
+在 `shellFor` 里加日志后，点两次「新对话」的输出：
+
+```
+hub.ts shellFor, sessionId: session-90eb4d84-e9cc-42a3-a1a9-b6374d7b6817
+hub.ts shellFor, sessionId: session-9795c8cf-ad52-4fa5-abbd-79ef4a024ce6
+```
+
+两个完全不同的 UUID。
+
+**根因不是「没有 id」，是「每次都有新的 id」。**
+
+- 第一次新对话 → 草稿写进 `dsh.conversation.session-aaa`
+- 再点新对话 → 生成 `session-bbb` → 读 `dsh.conversation.session-bbb`（空的）
+- `aaa` 里的草稿还在，但再也不会有人读它
+
+`localStorage` 里那一刻躺着十几条 `dsh.conversation.session-*`，每条都存着同一份文字——这就是「草稿确实被保存了」
+和「用户看不到」同时成立的原因。
+
+## 五、修复的第一版：只改了一半
+
+思路：blank session（还没发过消息的）统一用一个固定槽 `__pending__`。
+
+改完读取，测试——**还是丢**。
+
+原因很朴素：**只改了读，没改写。** 读的时候查 `__pending__`，写的时候 store 的自动持久化仍然按
+`session-xxx` 落盘。读和写指向两个不同的 key，等于没改。
+
+> 教训：持久化问题的第一反应应该是「读和写是不是对称的」，而不是先怀疑读取逻辑。
+
+补上写入端后功能通了。写法是在 `shellFor` 里对这个 shell 的状态做订阅，草稿一变就镜像写回固定槽：
+
+```ts
+if (snapshot.blank) {
+  const unwatch = shell.state.subscribe(() => {
+    writeConversationDraft(null, shell.draftSnapshot)
+  })
+  actx.effect(() => unwatch, 'conversation.input: persist blank draft')
+}
+```
+
+`actx.effect` 是 DSH 的生命周期原语：它保证 session 销毁时这个订阅被解除。手动写 `subscribe` 而不挂生命周期，
+就是内存泄漏。
+
+## 六、被「看不见」骗过一次
+
+功能验证通过后，我以为完事了。追问之下才发现一个更隐蔽的问题：
+
+**消息发出去之后，`__pending__` 里那份草稿还在。**
+
+用户看不到，是因为下一次新对话时前端把输入框清空了——**「界面正确」掩盖了「状态错误」**。
+localStorage 里那份文字会一直留着，直到被下一次输入覆盖。
+
+修法：在 `sink()` 里记下发送前的 blank 状态，成功后清掉两个槽：
+
+```ts
+const wasBlank = session.getSnapshot().blank
+const outcome = await this.conversation().sendSession(...)
+if (wasBlank && outcome.kind === 'success') {
+  clearConversationDraft(null)                            // 共享槽
+  clearConversationDraft(session.getSnapshot().sessionId) // 该 session 自己的槽
+}
+```
+
+## 七、最后的边界：这是 harness 的设计缺口
+
+看截图时发现，每个新对话除了写 `__pending__`，还各留了一条 `dsh.conversation.session-xxx`，内容一模一样。
+
+这不是我们的 bug，是 DSH 的：`sink` 的注释写得很直白——
+
+> The session is always a real host entity (materialized when its workspace was picked)
+
+**选 workspace 的那一刻 Session 就已经物化了。** 所以「新对话」在模型里根本不是一个独立概念，
+它天然拿不到稳定的草稿身份。缺的是 **draft slot（草稿槽）** 这一层抽象。
+
+完整解法要把物化推迟到第一条消息提交时。但有个硬约束挡住：模型选择、权限模式、Agent preset 全部读
+`session.projections`——没有 `SessionBinding`，这些控件渲染不出来。**这大概率正是当初把物化提前到选 workspace 的原因。**
+
+所以这次 PR 只做客户端止血，把根治方向写进 PR 让维护者判断，另开 issue 记录设计缺口。
+
+## 八、可复用的调试套路
+
+1. **先确认代码有没有跑，再确认结果对不对。** 日志一条不出，说明假设的前提就错了——这时候读多少代码都是浪费。
+1. **优先怀疑「读写的对称性」，而不是读取逻辑。** 持久化问题尤其如此。
+1. **「界面正确」不等于「状态正确」。** 界面会掩盖状态。要验证状态，直接去看存储介质。
+1. **假设被推翻时，立刻重建心智模型。** 卡了两次，都是因为抱着旧模型去解释新证据。
+1. **不确定边界时，先问「这是谁的问题」。** 定位到 `sink` 注释那一刻，问题性质从「我写错了」变成「设计缺一层抽象」，
+   PR 的写法也随之改变。
+
+## 九、顺手踩到的两个小坑
+
+**控制台里的 `const` 会静默失败。** 在 DevTools 里第二次执行 `const pending = ...` 会报 already been declared，
+后面的 `console.log` 全不执行——看到 `undefined` 时，先确认脚本本身跑没跑。
+
+**行尾空白会让 CI 挂。** 编辑时留下的几个「只含空格的空行」被 `oxlint` 抓出来了：
+`@stylistic(no-trailing-spaces)`。提交前跑一遍 lint，比等 CI 报错快。
+
+## 十、最终改动
+
+{% table %}
+- 文件
+- 改动
+---
+- `stores.ts`
+- 抽出 `draftStorageKey()`；`readConversationDraft` 接受 `null`；新增 `writeConversationDraft` / `clearConversationDraft`
+---
+- `hub.ts`
+- `shellFor` 里 blank Session 读写共享槽；`sink` 里首条消息成功后清理
+---
+- `conversation-store.client.spec.ts`
+- 6 条新用例：共享槽读写、与 Session 槽隔离、清理、缺失/拒绝访问降级
+{% /table %}
+
+验证：`tsc -b tsconfig.client.json` 通过、`oxlint` 无告警、`vitest` 28/28。
+
+## 十一、遗留
+
+- **冗余写入**：blank 期间 scoped store 仍会持久化一份。根治点在 `apply.ts` 的 `bindDraftPersistence`——
+  让它也走同一个 blank/非 blank 判断，blank 时只写共享槽。已写进 PR 供维护者判断。
+- **设计缺口**：新对话缺少草稿身份，需要把物化推迟到首条消息。已开 issue。
+
+---
+
+*这次排查里最关键的一步，其实是「加日志发现代码根本没跑」——而不是任何一次读代码。*
