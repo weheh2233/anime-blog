@@ -11,6 +11,19 @@ export type LocalMusicTrack = {
 // Generated from src/content/music. Edit music entries in Keystatic instead.
 export const LOCAL_MUSIC: LocalMusicTrack[] = [
   {
+    "id": 3533918445,
+    "name": "1% Battery Girl \u4f4e\u7535\u91cf\u5973\u5b69",
+    "artists": [
+      "ChiliChill\u4e50\u56e2",
+      "\u4e09Z-STUDIO",
+      "HOYO-MiX"
+    ],
+    "album": "ZZZ",
+    "cover": "/images/music/1-battery-girl/cover.jpg",
+    "duration": 0,
+    "url": "/music/1-battery-girl/audio.mp3"
+  },
+  {
     "id": 177908434,
     "name": "\u554a\uff01\u7f8e\u4e3d\u5361\u6d1b",
     "artists": [
