@@ -1,0 +1,484 @@
+---
+title: 2026-11-06-AI应用工程周报
+description: >-
+  生成时间：20261106（Asia/Shanghai） 读者定位：计算机专业本科生，目标岗位为 AI 大模型应用工程师 / 后端开发
+  范围：只覆盖应用与后端工程视角；不含训练、微调、GPU 与推理引擎内核 口径：✅ 一手（GitHub Release / 安全公告 / 官方文档）；🟡
+  二手或厂商口径；🔵 我的判断
+author: Kira
+publishDate: 2026-11-06
+zone: 编程
+tags:
+  - AI周报
+draft: false
+pinned: false
+---
+# AI 应用工程前沿周报（2026-10-30 ~ 2026-11-06）
+
+生成时间：2026-11-06（Asia/Shanghai）
+读者定位：计算机专业本科生，目标岗位为 AI 大模型应用工程师 / 后端开发
+范围：只覆盖应用与后端工程视角；不含训练、微调、GPU 与推理引擎内核
+口径：✅ 一手（GitHub Release / 安全公告 / 官方文档）；🟡 二手或厂商口径；🔵 我的判断
+
+---
+
+## 1. 本周摘要
+
+1. **本周最该看的是三个安全公告，而不是新功能。** pydantic-ai v2.66.0（11-04）一次修了多个高危问题：`web_fetch` 把 JSON 重新缩进时嵌套深度可把内存放大数百倍、secret redaction 的 `private_key` 正则可被构造文本打到指数回溯、云元数据黑名单漏了腾讯云的 `169.254.0.23`（可读到实例临时凭证）。
+   → 求职含义："工具能联网"就是 SSRF 面。能讲清 IP 段校验、DNS 重绑定、重定向复检、大小/深度上限的人，比只会写 tool schema 的人稀缺得多。
+1. **Human-in-the-loop 从"弹窗"变成"带版本的状态机"。** LangGraph 1.2.20（11-05）给每个 `interrupt()` 独立 id，并新增严格 resume 模式，拒绝过期的中断答复。
+   → 求职含义：审批接口必须能识别"用户点的是 10 分钟前那个旧弹窗"，这是幂等与并发控制的经典面试题，只是换了个 AI 外壳。
+1. **分类模型继续往框架里钻。** LangChain 新包 `langchain-typesafe`（11-04/05）把 TypeSafe 的 System One 分类器接进 experimental middleware；AG2 1.3.0（11-04）则把"委派树观测"和"任务生命周期"补上。
+   → 求职含义：路由/判定正在变成框架的一等公民，"分类器 + 阈值 + 兜底"这套写法值得直接学。
+1. **协议层开始为"中断—恢复"定标准事件。** AG-UI Kotlin SDK 0.5.0（11-05）对齐 AG-UI 1.0，新增 `Interrupt` / `ResumeStatus` / `ResumeEntry` 与 ACTIVITY 事件，`THINKING_*` 被 `REASONING_*` 取代。
+   → 求职含义：跨端 agent UI 的"暂停—人工确认—续跑"有了共同词汇，写前端/全栈岗可以照着实现。
+1. **分发方式也在变成工程问题。** OpenAI Agents SDK 0.24.0-alpha.6（11-03）改为按平台分发自带原生运行时的 wheel（`cp310-abi3`，不经 PyPI，无需 Rust 工具链）。
+   → 求职含义：依赖体积、平台矩阵、离线安装是部署岗的真实工作，面试聊"你们怎么发版"时有话可说。
+
+---
+
+## 2. 重点进展
+
+### 1. pydantic-ai v2.66.0：三个高危安全修复（安全 / 后端 / 2026-11-04）
+
+- **具体变化**（均为 GHSA 公告）：
+
+  - `GHSA-m5vj-8mcw-82qx`（high）：`web_fetch_tool` 与 `WebFetch` 的本地兜底路径，在应用返回内容上限**之前**先在事件循环里把 JSON 重新缩进；一个在下载体积限制内、但嵌套极深的文档可以膨胀到数百倍，吃掉大量内存并阻塞同进程其他请求。provider 原生 web fetch 不受影响。
+  - `GHSA-mfx5-pc32-32m8`（high）：secret redaction 的 `private_key` 模式在构造文本上指数回溯，几百字符就能占住事件循环数分钟。用到 `redact_secrets` / `secret_data()` 且文本可被攻击者影响即受影响；harness 侧修在 0.66.0。
+  - `GHSA-5fj9-5pjw-vpwc`（medium）：云元数据黑名单未包含腾讯云 `169.254.0.23`，允许本地 URL 时可被用来读取实例临时角色凭证（`force_download='allow-local'` 或 `web_fetch_tool(allow_local_urls=True)` 场景）。
+  - 同版本还有第四个 GHSA（release 说明中列在末尾，本文未逐条展开）。
+
+- **工程细节**：修复版本为 `pydantic-ai 2.66.0` 与 `pydantic-ai 1.107.10`（`pydantic-ai-slim` 同步）；harness 安全修复在 `pydantic-ai-harness 0.66.0`。
+
+- **解决什么工程问题**：把"用户可控 URL + 用户可控文本"这两类输入当成不可信边界。前者是 SSRF/内网探测，后者是 ReDoS 与内存放大——都是"功能正常但能被拖垮"的隐蔽故障。
+
+- **最小示例**（清单式自检，配合第 7 节代码）：
+
+  pip install -U "pydantic-ai>=2.66.0"
+  pip show pydantic-ai | findstr Version      # Windows
+  python -c "import pydantic_ai, sys; print(pydantic_ai.**version**)"
+
+- **实践方向**：把项目里所有"让模型/用户提供 URL"的工具列出来，逐个加白名单与体积上限，写成一张风险表放进 README。
+
+- **来源**：GitHub pydantic/pydantic-ai release v2.66.0 及其 GHSA 链接
+
+### 2. AG2 v1.3.0：委派树观测 + 显式作用域 + 共享任务生命周期（Agent 框架 / 2026-11-04）
+
+- **具体变化**：
+  - 祖先 agent 现在能收到**所有后代**的事件（含流式 chunk），以 `ChildEvent` 形式到达：不进祖先的模型上下文、不触发其工具/模型循环/HITL。
+  - `@observer(...)` 类型化回调可监控整棵委派树；事件带 `event.origin` 指向发起该事件的调用，用 `await event.origin.send(...)` 把事件送回那条调用链的正常处理器；句柄在调用结束时失效，回放历史时不可用。
+  - 新增显式变量作用域、动态模型上下文、共享任务生命周期。
+  - 1.4 迁移清单：`TaskConfig` / `Agent(tasks=...)` / `run_subtask` 工具 → 用 `Agent.as_tool()` 显式委派；`Agent(assembly=...)` → `middleware=` 注册 `AssemblerMiddleware`；`Agent(knowledge=...)` → `plugins=[KnowledgePlugin(...)]`；`Agent.task()` → 直接构造 `Task(owner_id=..., spec=TaskSpec(...))`。
+  - 要求 Python ≥ 3.11。
+- **工程细节**：`OpenAIConfig` 在 1.4 将成为 `OpenAIResponsesConfig` 的别名，需显式改用 `OpenAIResponsesConfig` 或 `OpenAICompletionsConfig`。
+- **解决什么工程问题**：多 agent 的"观测盲区"——子 agent 出错时父 agent 看不到细节；同时用"观察事件不进上下文"避免观测本身污染提示词、放大 token。
+- **实践方向**：给一个两级 agent（协调者 + 2 个 worker）加上 observer，把"哪个 worker 在哪一步失败"直接落到日志与 trace。
+- **来源**：GitHub ag2ai/ag2 release v1.3.0
+
+### 3. LangGraph 1.2.20：严格 resume 拒绝过期答复（Agent 运行时 / 2026-11-05）
+
+- **具体变化**：每个 `interrupt()` 获得独立 id（同一 task 内多次中断不再混淆）；新增严格 resume 模式，拒绝"过期"的中断答复；错误提示指向当前文档。
+
+- **工程细节**：同周 `langgraph==1.2.20`、`langgraph-sdk==0.4.13/0.4.14`、`langgraph-cli==0.4.41/0.4.42` 连续发布；1.2.19 已修过"暂停的工具在 tools 流里被报成失败"。
+
+- **解决什么工程问题**：真实事故形态——用户在两台设备上各点了一次"同意"，或网络重试导致同一答复提交两次；没有版本/ID 校验时，旧答复会作用到新状态上，产生越权操作。
+
+- **最小示例**（配置层示意，具体参数名以 1.2.20 文档为准）：
+
+  # 启用严格 resume 后，提交答复需带上中断 id
+
+  graph.invoke(Command(resume={"interrupt_id": saved_id, "answer": "approve"}), config=cfg)
+
+- **实践方向**：把"审批 id + 状态版本"写进你的 API 契约，前端提交时回传，服务端不匹配就返回 409。
+
+- **来源**：GitHub langchain-ai/langgraph release 1.2.20
+
+### 4. langchain-typesafe 0.0.1 / 0.0.2：分类器进 LangChain 中间件（框架 / 2026-11-04 ~ 11-05）
+
+- **具体变化**：新包 `langchain-typesafe` 首发（0.0.1，11-04），次日 0.0.2（11-05）在 experimental middleware 中接受 `classifier`。TypeSafe 的 Jev 是"System One"模型：不生成文本，输入状态 + 问题，返回类型化答案与概率（官方称分类任务最高 200 倍快、400 倍便宜，🟡 厂商口径）。
+
+- **工程细节**：包处于 0.0.x，API 不稳定；LangChain 文档已新增 TypeSafe provider 页。配合上周 ADK 的 `ClassifierNode`、AG2 的 `OpenAIDecisionsConfig`，说明"分类器"正在成为跨框架的标准构件。
+
+- **解决什么工程问题**：agent 循环里每次决策都调一次 LLM，慢且贵；把"判断"换成一次前向的分类调用，能直接砍掉大部分决策成本。
+
+- **最小示例**（Python，按 release 说明示意）：
+
+  pip install "langchain-typesafe==0.0.2"
+
+  from langchain_typesafe import TypeSafeClassifier   # 具体导出名以 0.0.2 文档为准
+  classifier = TypeSafeClassifier(labels=["billing", "technical", "other"])
+
+- **实践方向**：在同一批 200 条工单上对比"LLM 路由"与"分类器路由"的成本、P95 与误路由率。
+
+- **来源**：GitHub langchain-ai/langchain releases langchain-typesafe==0.0.1 / 0.0.2；LangChain TypeSafe 集成文档
+
+### 5. AG-UI Kotlin SDK 0.5.0：对齐 AG-UI 1.0，中断—恢复有标准事件（协议 / 2026-11-05）
+
+- **具体变化**：
+  - 对齐 AG-UI 1.0：严格的事件/输入解码、state patch 结构校验。
+  - 新增 `REASONING_*` 事件，`THINKING_*` 与 `ThinkingTelemetryState` 弃用（带 ReplaceWith 提示）。
+  - 新增中断协议支持：`Interrupt` / `ResumeStatus` / `ResumeEntry`，挂在 RUN_FINISHED 的 outcome 上。
+  - 新增 `ACTIVITY_SNAPSHOT` / `ACTIVITY_DELTA` 事件、`ActivityMessage`、`Role.ACTIVITY`、`ToolMessage.error`、多模态 `UserMessage`；新增 wasmJs 与 macosArm64 target。
+  - 破坏性变更：严格解码可能拒绝此前能通过的 payload。
+- **工程细节**：包坐标 `com.ag-ui.community:kotlin-core:0.5.0`（client/tools 同步 0.5.0）；修复长 JSON Pointer 导致栈溢出。
+- **解决什么工程问题**：跨端（Kotlin/Android/桌面）的 agent UI 需要同一套"暂停—审批—续跑"语义，否则每个端各写一套状态机。
+- **实践方向**：用一个 Kotlin/Compose 小 demo 渲染 `Interrupt`，点击后发 `ResumeEntry`，验证续跑不重复执行工具。
+- **来源**：GitHub ag-ui-protocol/ag-ui release/2026-11-05
+
+### 6. OpenAI Agents SDK 0.24.0-alpha.6：原生运行时改为按平台分发 wheel（部署 / 2026-11-03）
+
+- **具体变化**：预览版改为 GitHub Releases 分发的自带原生运行时 wheel（`cp310-abi3`，支持 CPython 3.10–3.14），无需 Rust 工具链或源码构建；不提供 Intel Mac、ARM Linux、ARM Windows、Alpine/musl、PyPy、free-threaded 的 wheel；不经 PyPI。
+- **工程细节**：安装命令形如
+  python -m pip install "https://github.com/openai/openai-agents-python/releases/download/v0.24.0-alpha.6/openai_agents-0.24.0a6-cp310-abi3-manylinux_2_39_x86_64.whl"
+  校验：`python -c "from importlib.metadata import version; import agents._native; print(version('openai-agents'))"`。
+- **解决什么工程问题**：带原生扩展的 agent SDK 在容器/CI 里构建成本高、平台矩阵复杂；预编译 wheel 把"装不上"变成"选错平台"，但代价是分发渠道（非 PyPI）与平台覆盖需要自己兜底。
+- **实践方向**：在 Docker 里做一次离线安装演练，记录镜像体积变化与安装耗时。
+- **来源**：GitHub openai/openai-agents-python release v0.24.0-alpha.6
+
+### 7. Langfuse v4.73 ~ v4.76：审计日志、Topics API、会话视图（可观测 / 2026-11-03 ~ 11-05）
+
+- **具体变化**：trace/session/score 的**读取**也进审计日志（`#19625`）；Topics 的摘要、分配与规则开放到 public API、MCP 与站内 agent（`#19308`）；新增按时间排序的 session 列表与 trace 侧栏 session 标签；self-host 上报 AI gateway key 数量。
+- **工程细节**：MCP 暴露意味着"用 agent 查自己的观测数据"成为可行路径；审计覆盖读操作是合规（尤其企业采购）的硬要求。
+- **解决什么工程问题**：观测平台自身的数据访问需要可追责；大量 trace 需要"按主题聚类"而不是一条条看。
+- **实践方向**：把"谁看了哪条含 PII 的 trace"接进内审报表，验证读审计是否完整。
+- **来源**：GitHub langfuse/langfuse releases v4.73.0 ~ v4.76.0
+
+### 8. LiteLLM v1.108.1：LTS 分支 + 透传凭证的团队隔离修复（网关 / 2026-11-05）
+
+- **具体变化**：1.108 进入 LTS 维护；本版把 21 个主干修复回移到 `lts/1.108.x`，并在 CI 里对 stable / rc / lts 三个分支跑 OSV 扫描与单测；修复 `passthrough` 在选择 proxy 级透传凭证时未跳过 team deployment 的问题（`#50217`）。
+- **工程细节**：透传（pass-through）凭证用于把请求原样转发到上游；若选中了别的团队的 deployment，就等于用错凭证、串了租户。
+- **解决什么工程问题**：多租户网关的凭证隔离——这类 bug 不会报错，只会让 A 团队的用量记到 B 团队账上，或者用错配额。
+- **实践方向**：给网关写一条回归测试：两个 team 各配一个透传凭证，断言请求只命中自己的 deployment。
+- **来源**：GitHub BerriAI/litellm release v1.108.1
+
+> 其他值得记一笔的发版（不单列）：CrewAI 1.15.36（11-06）新增 experimental 会话式 Agent session；Vercel `ai@7.0.163`（11-05）为常规补丁；Agno 本周无新版本。
+
+---
+
+## 3. 求职价值分级
+
+**优先掌握（直接影响面试与作品集）**
+
+- 工具侧 SSRF 防护：IP 段校验、DNS 重绑定、重定向复检、体积/深度上限（pydantic-ai 三个 GHSA 的直接教训）。
+- 审批的幂等与过期控制：中断 id、状态版本、409 处理（LangGraph 1.2.20 的方向）。
+- 分类器路由：概率 + 阈值 + 兜底 + 成本对比（langchain-typesafe / ADK / AG2 三处都在做）。
+- 正则与 JSON 处理的资源上限：避免 ReDoS 与内存放大，别在事件循环里做重活。
+
+**值得了解**
+
+- 委派树观测（AG2 `ChildEvent` / `@observer`）：多 agent 的"观测不进上下文"设计。
+- AG-UI 1.0 的中断协议：跨端 UI 的统一状态机。
+- 原生 wheel 分发与平台矩阵：部署岗的日常。
+- 审计日志覆盖读操作：企业采购的合规门槛。
+
+**持续观察**
+
+- `langchain-typesafe` 是否脱离 0.0.x，抽象是否与 ADK/AG2 收敛。
+- AG-UI 1.0 破坏性变更的生态采用速度。
+- OpenAI Agents SDK 0.24 正式版是否回到 PyPI。
+- LiteLLM LTS 的维护节奏（安全回移是否及时）。
+
+**判断依据**：优先掌握项满足"能当天写代码 + 面试能追问三层 + JD 高频"；0.0.x/alpha 且 API 未稳的，只做观察不做押注。
+
+---
+
+## 4. 本周重点推荐
+
+**推荐一：给 agent 的联网工具加安全边界（岗位：AI 应用 / 后端安全）**
+
+- 面试考点：SSRF 与 DNS 重绑定、为什么要复检重定向、元数据地址有哪些（AWS/GCP/Azure/腾讯云）、如何限制响应体积与 JSON 深度、为什么不能在事件循环里做大 JSON 处理。
+- 简历成果：一个 `safe_fetch` 工具 + 12 条攻击用例（内网、元数据、十进制 IP、重定向跳内网、超大响应、深层嵌套）+ 全部被拦截的测试报告。
+
+**推荐二：审批流做成带版本的状态机（岗位：后端 / Agent 平台）**
+
+- 面试考点：幂等键设计、乐观锁与 409、重复提交、乱序到达、超时未审批如何回收、审批记录如何审计。
+- 简历成果：SQLite/Postgres 审批表 + `expected_version` 校验 + 并发双提交测试 + 与 LangGraph 中断 id 的对接说明。
+
+**推荐三：分类器路由的成本实验（岗位：AI 应用 / 平台）**
+
+- 面试考点：分类器与 LLM 路由的成本结构差异、概率校准、阈值选择、分类器故障降级、如何评估误路由。
+- 简历成果：200 条标注集 + 三个阈值下的覆盖率/准确率表 + 成本与 P95 对比 + 一条"低于阈值转人工"的链路。
+
+---
+
+## 5. 两小时行动清单（可当天跑通）
+
+**0:00–0:15 环境**
+
+- 建 repo：agent-safety。目录：`app/`、`tools/`、`tests/`、`evals/`。
+
+  python -m venv .venv && .venv\Scripts\activate
+  pip install fastapi uvicorn httpx pytest pydantic
+
+**0:15–0:45 写 safe\_fetch（第 7 节有完整实现）**
+
+- 先写 5 条攻击用例（`127.0.0.1`、`169.254.169.254`、`169.254.0.23`、`10.0.0.1`、`[::1]`），确认当前实现**全部放行**——先看到漏洞，再修。
+- 加上 IP 段校验与重定向复检后重跑，预期 5 条全部拒绝。
+- 预期产出：`pytest -q` 从 5 failed 变 5 passed 的两次截图。
+
+**0:45–1:15 审批状态机**
+
+- 建表：
+
+  CREATE TABLE approvals (
+  id TEXT PRIMARY KEY, run_id TEXT, interrupt_id TEXT,
+  version INTEGER NOT NULL, status TEXT NOT NULL,
+  decided_by TEXT, decided_at TEXT
+  );
+
+- 端点 `POST /approvals/{id}/decide` 要求 body 带 `expected_version`；不匹配返回 409；同版本重复提交返回 200 但不重复执行（幂等）。
+
+- 预期产出：并发两个请求只生效一个；用旧 version 提交返回 409 的测试。
+
+**1:15–1:45 分类器路由对比**
+
+- 用 `router/classify.py` 的桩函数产出概率，跑阈值扫描（覆盖率/准确率/误路由率三列）。
+- 有时间再装 `langchain-typesafe==0.0.2` 跑真实调用（需要 API key），对比 P95。
+- 预期产出：一张三行表格写进 README。
+
+**1:45–2:00 收尾**
+
+- README：威胁模型（谁能控制 URL/文本）、防护清单、实测数字、已知限制（未做 DNS 钉扎等）。
+
+---
+
+## 6. 简历与面试转化
+
+**项目 A：安全联网工具集（技术栈：Python + httpx + pytest，6\~8 小时）**
+
+- 成果：`safe_fetch` / `safe_download` 两个工具，内置 IP 段黑名单、重定向复检、体积与深度上限、超时；12 条攻击用例全绿。
+- 可能追问：DNS 重绑定怎么防？为什么要"解析后校验 IP 再连接"？IPv6 映射地址怎么处理？为什么不用黑名单而用白名单？
+
+**项目 B：Agent 审批服务（技术栈：FastAPI + SQLite/Postgres + LangGraph，8\~10 小时）**
+
+- 成果：审批表 + 版本校验 + 幂等 + 审计日志 + 与中断 id 对接；并发与乱序测试。
+- 可能追问：为什么不用"最后写入胜出"？审批超时怎么回收？跨服务如何保证只执行一次（分布式幂等）？
+
+**项目 C：分类器路由实验（技术栈：Python + 标注集 + 任一分类端点，6\~8 小时）**
+
+- 成果：阈值扫描 + 成本/延迟对比 + 误路由案例分析 + 降级链路。
+- 可能追问：概率不校准怎么处理？分类器超时怎么办？如何防止输入注入影响分类？
+
+以上为建议方案，请按实际完成情况如实描述。
+
+---
+
+## 7. 技术深潜一：把"联网工具"做成安全边界
+
+**问题定义**
+只要工具能根据模型/用户提供的 URL 发请求，就同时打开了三个口子：① 访问内网与云元数据（SSRF）；② 被超大或超深的响应拖垮进程；③ 被构造文本触发正则灾难（ReDoS）。本周 pydantic-ai 的三个 GHSA 正好对应这三类。
+
+**方案与架构**
+
+用户/模型给出 URL
+-> scheme 白名单（http/https）
+-> host 白名单（可选，最强）
+-> DNS 解析，逐个 IP 校验（拒绝私网/回环/链路本地/元数据）
+-> 用解析出的 IP 连接（钉扎），Host/SNI 仍用原域名
+-> 手动跟随重定向，每跳重新校验（≤3 跳）
+-> 流式读取并按字节上限截断
+-> JSON 解析前先做深度/节点数上限
+所有环节共用：超时、并发上限、审计日志
+
+**关键实现**（可直接复制）
+
+\# tools/safe_fetch.py
+import ipaddress, json, socket
+from urllib.parse import urlparse, urljoin
+import httpx
+
+BLOCKED = [ipaddress.ip_network(n) for n in (
+"0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8",
+"169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16",
+"198.18.0.0/15", "224.0.0.0/4",
+"::1/128", "fc00::/7", "fe80::/10", "::ffff:0:0/96",
+)]
+
+def check_url(url: str, allowed_hosts: set[str] | None = None) -> None:
+u = urlparse(url)
+if u.scheme not in ("http", "https"):
+raise ValueError("scheme not allowed")
+if not u.hostname:
+raise ValueError("no host")
+if allowed_hosts is not None and u.hostname not in allowed_hosts:
+raise ValueError("host not allowed")
+infos = socket.getaddrinfo(u.hostname, None)
+for family, _, _, _, sockaddr in infos:
+ip = ipaddress.ip_address(sockaddr[0])
+if any(ip in net for net in BLOCKED):
+raise ValueError(f"blocked address {ip}")
+
+def json_depth_ok(raw: bytes, max_depth: int = 64) -> bool:
+depth, in_str, esc = 0, False, False
+for ch in raw.decode("utf-8", "replace"):
+if in_str:
+if esc: esc = False
+elif ch == "": esc = True
+elif ch == '"': in_str = False
+continue
+if ch == '"': in_str = True
+elif ch in "[{":
+depth += 1
+if depth > max_depth: return False
+elif ch in "]}":
+depth -= 1
+return True
+
+async def safe_fetch(url: str, *, max_bytes: int = 2_000_000,
+max_redirects: int = 3, max_depth: int = 64) -> bytes:
+for _ in range(max_redirects + 1):
+check_url(url)
+async with httpx.AsyncClient(follow_redirects=False, timeout=10.0) as c:
+async with c.stream("GET", url, headers={"User-Agent": "safe-fetch/1.0"}) as r:
+if r.status_code in (301, 302, 303, 307, 308):
+loc = r.headers.get("location")
+if not loc: raise ValueError("redirect without location")
+url = urljoin(url, loc)
+continue          # 下一跳重新校验，防止跳到内网
+r.raise_for_status()
+buf = bytearray()
+async for chunk in r.aiter_bytes():
+buf.extend(chunk)
+if len(buf) > max_bytes:
+raise ValueError("response too large")
+data = bytes(buf)
+if data.lstrip()[:1] in (b"{", b"[") and not json_depth_ok(data, max_depth):
+raise ValueError("json too deep")
+return data
+raise ValueError("too many redirects")
+
+**验证方式与常见坑**
+
+- 验证用例（至少覆盖）：`127.0.0.1`、`169.254.169.254`、`169.254.0.23`（腾讯云）、`10.0.0.1`、`[::1]`、十进制 IP `2130706433`、`http://example.com@127.0.0.1/`、302 跳内网、超大响应、深度 500 的 JSON。
+- 坑一：**check-then-connect 的时间差**。解析通过后连接时可能被 DNS 重绑定指向内网。彻底做法是"解析出 IP 后直接连 IP，Host/SNI 用域名"，或给 httpx 配自定义 transport 固定解析结果。
+- 坑二：只校验第一次 URL，忘了每一跳重定向。
+- 坑三：IPv6 映射地址（`::ffff:127.0.0.1`）绕过只查 IPv4 的黑名单。
+- 坑四：把"体积上限"写在读完之后——要边读边计数。
+- 坑五：在事件循环里 `json.dumps(indent=2)` 一个深文档，就是 GHSA-m5vj 的翻版；重活丢线程池或直接拒绝。
+- 坑六：正则做脱敏时用回溯型写法（`(a+)+` 类），几百字符就能卡死；用有界模式或第三方 RE2 类引擎。
+
+---
+
+## 8. 技术深潜二：审批流做成带版本的状态机
+
+**问题定义**
+Agent 执行到危险动作要人工确认。朴素实现是"存一个 pending 标记，用户点同意就把标记改成 approved"。问题：用户在两台设备各点一次、网络重试重复提交、审批 10 分钟后才点（此时任务已被别的操作改变）、旧弹窗在新状态上生效——每一条都可能造成越权。
+
+**方案与架构**
+
+创建审批: id, run_id, interrupt_id, version=0, status=pending
+用户决定: POST {expected_version, answer, actor}
+-> version 不匹配: 409（前端刷新后重试）
+-> status 非 pending: 200 幂等返回（不重复执行）
+-> 匹配: version+1, status=approved/rejected, 写审计
+执行侧: 只在 status=approved 且 version 等于自己看到的那版时执行
+
+**关键实现**（可直接复制，SQLite 版）
+
+\# app/approvals.py
+import sqlite3, time
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+DB = "approvals.db"
+
+def db():
+c = sqlite3.connect(DB, isolation_level=None)
+c.execute("""CREATE TABLE IF NOT EXISTS approvals(
+id TEXT PRIMARY KEY, run_id TEXT, interrupt_id TEXT,
+version INTEGER NOT NULL, status TEXT NOT NULL,
+decided_by TEXT, decided_at REAL)""")
+return c
+
+class Decision(BaseModel):
+expected_version: int
+answer: str
+actor: str
+
+@app.post("/approvals/{aid}/decide")
+def decide(aid: str, body: Decision):
+c = db()
+try:
+c.execute("BEGIN IMMEDIATE")          # 写锁，避免并发双批准
+row = c.execute("SELECT version, status FROM approvals WHERE id=?",
+(aid,)).fetchone()
+if row is None:
+raise HTTPException(404, "approval not found")
+version, status = row
+if body.expected_version != version:
+c.execute("ROLLBACK")
+raise HTTPException(409, "stale approval, refresh and retry")
+if status != "pending":
+c.execute("ROLLBACK")
+return {"ok": True, "idempotent": True}
+c.execute("""UPDATE approvals
+SET status=?, decided_by=?, decided_at=?, version=version+1
+WHERE id=? AND version=?""",
+(body.answer, body.actor, time.time(), aid, version))
+c.execute("COMMIT")
+return {"ok": True, "version": version + 1}
+except HTTPException:
+raise
+except Exception:
+c.execute("ROLLBACK")
+raise
+finally:
+c.close()
+
+**验证方式与常见坑**
+
+- 验证：① 两个线程同时提交同一 version，断言只有一个 200 + version+1，另一个 409 或幂等；② 用旧 version 提交返回 409；③ 已决定后再提交返回 200 且不重复执行；④ 断网重试不会产生两次副作用。
+- 坑一：用 `SELECT ... FOR UPDATE` 之外的方式做"先查后改"，在并发下必然双批准；SQLite 用 `BEGIN IMMEDIATE`，Postgres 用 `SELECT ... FOR UPDATE`。
+- 坑二：幂等判断只看 status 不看 version，导致"旧答复被当成幂等"。
+- 坑三：审批记录缺 `interrupt_id`，与 LangGraph 的中断对不上，恢复时找不到该续哪一步。
+- 坑四：只做 UI 禁用按钮，服务端不校验——前端永远不可信。
+- 坑五：审批超时不处理，pending 永久占着任务；要有超时回收与"过期需重新发起"的语义。
+
+---
+
+## 9. 面试技术问答准备
+
+1. **SSRF 怎么防才算完整？** scheme 白名单 + host 白名单 + 解析后 IP 校验 + 连接钉扎 + 每跳重定向复检 + 体积/超时上限；只做字符串匹配 URL 一定被绕过。
+1. **为什么 DNS 校验之后还要钉扎？** 校验与连接之间存在时间差，攻击者可用 DNS 重绑定把第二次解析指向内网；钉扎（连 IP、Host/SNI 用域名）消除这个窗口。
+1. **审批接口为什么需要 version？** 防旧答复作用到新状态；配合 `BEGIN IMMEDIATE` 或行锁实现"只有一个批准生效"，并对重复提交返回幂等结果。
+1. **分类器和 LLM 路由怎么选？** 判断类（分类、是否转人工、选工具）用分类器：只付输入、无解码、概率可阈值；需要解释或长尾判断时用 LLM，并保留兜底。
+1. **多 agent 的观测事件为什么不进父上下文？** 否则观测本身会污染提示词、放大 token 并改变行为；只进日志/trace，需要干预时再用显式句柄回送。
+1. **原生 wheel 分发对部署有什么影响？** 构建简单、无工具链依赖，但平台矩阵受限（无 musl/ARM 等）、渠道不在 PyPI，需要自己镜像与离线包管理。
+
+---
+
+## 10. 持续观察
+
+{% table %}
+- 方向
+- 观察信号
+---
+- 工具安全
+- 是否出现统一的"安全抓取"规范或 SDK 内置防护
+---
+- 审批/中断
+- LangGraph 严格 resume 是否默认开启；AG-UI 1.0 中断协议采用率
+---
+- 分类器生态
+- `langchain-typesafe` 是否脱离 0.0.x；与 ADK/AG2 抽象是否收敛
+---
+- 多 agent 观测
+- `ChildEvent` 类设计是否被其他框架采用
+---
+- 分发与供应链
+- OpenAI Agents SDK 正式版是否回 PyPI；LiteLLM LTS 安全回移节奏
+---
+- 可观测合规
+- 读操作审计是否成为观测平台标配
+---
+- 岗位 JD
+- 关键词：SSRF、幂等、审批流、分类路由、预算、多租户、审计
+{% /table %}
+
+---
+
+## 11. 来源与说明
+
+- 主要来源：GitHub Release 与安全公告（pydantic/pydantic-ai v2.66.0 含 4 个 GHSA、ag2ai/ag2 v1.3.0、langchain-ai/langgraph 1.2.20、langchain-ai/langchain langchain-typesafe 0.0.1/0.0.2、ag-ui-protocol/ag-ui release/2026-11-05、openai/openai-agents-python v0.24.0-alpha.6、langfuse/langfuse v4.73~v4.76、BerriAI/litellm v1.108.1）；LangChain TypeSafe 集成文档。
+- 标注"厂商口径"的数字（如 Jev 的 200 倍/400 倍）未经第三方复现。
+- 本报告不涉及训练、微调与硬件选型；pydantic-ai 的第 4 个 GHSA 未逐条展开，请以官方公告为准。

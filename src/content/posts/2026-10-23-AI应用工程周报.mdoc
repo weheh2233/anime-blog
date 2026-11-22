@@ -1,0 +1,1376 @@
+---
+title: 2026-10-23-AI应用工程周报
+description: >-
+  执行日：20261023（周五） 覆盖窗口：20261016 → 20261023（UTC+8） 读者：计算机专业本科生，目标「AI 大模型应用工程师 /
+  后端开发」实习与校招 视角：只讨论"如何把模型能力做成可上线的产品与系统"；
+author: Kira
+publishDate: 2026-10-23
+zone: 编程
+tags:
+  - AI周报
+draft: false
+pinned: false
+---
+# AI 应用工程前沿周报（求职向）
+
+> **执行日**：2026-10-23（周五）　**覆盖窗口**：2026-10-16 → 2026-10-23（UTC+8）
+**读者**：计算机专业本科生，目标「AI 大模型应用工程师 / 后端开发」实习与校招
+**视角**：只讨论"如何把模型能力做成可上线的产品与系统"；**排除**训练、微调、RL、量化/精度格式、显存与算力规格、推理引擎内核、模型架构推导
+**事实分级**：✅ 一手可核验（官方 release / 官方文档 / 仓库 PR）｜🟡 二手转述（媒体、第三方博客，未能访问一手文档）｜🔵 我的判断（观点/推测，会显式标注）
+
+---
+
+## 0. 本周方法与可信度说明（先看这段，避免被误导）
+
+1. **一手来源优先**：本周 8 条进展中，6 条直接来自 GitHub Release / PR / 官方 changelog，版本号与日期可逐条点开核对。
+1. **有一处来源缺口**：OpenAI 官方文档站（developers.openai.com）对本环境返回 **403**，因此 Decisions API 一节靠两家二手来源交叉验证（マイナビニュース 2026-10-23、Apidog 2026-10-10），其**价格与"快 10 倍"是厂商口径**，正文已标注 🟡。
+1. **无重大进展就如实说**：本周没有新 frontier 模型发布（Gemini 4 Argon 是 10-13、Claude Haiku 5.5 是 10-07，都在窗口外，只进"持续观察"）。本周主线是**运行时调度、上下文压缩的可验证性、协议安全与可观测性**——恰好是最贴近"应用/后端工程"的一层。
+1. **不写算力数字**：全文不出现显存、卡数、训练吞吐等训练侧指标。
+
+---
+
+## 1. 本周摘要（5 条结论 + 对求职的含义）
+
+**结论 1：模型 API 开始"专用化"，判断类任务从"生成文本再解析"变成"要一个带概率的结构化答案"。**
+OpenAI 于 **10-22** 把 **Decisions API**（`POST /v1/decisions`）推向 GA：输入文本/图片，输出 `predicate`（0~1 概率）、`choice`（多选一 + 每项概率）、`score`（有序档位），单请求最多 **400 个问题**，且**只按输入 token 计费**（🟡 二手来源）。
+→ **求职含义**：后端岗最欢迎的"降本增效"叙事，从"换更便宜的模型"升级为"换更便宜的**调用形态**"。能讲清"分类/路由用 decisions、生成用 responses，两者成本结构不同"的候选人，比只会调 chat completions 的更有工程感。
+
+**结论 2：Agent 运行时开始补齐"调度层"——多租户、优先级、公平性进入框架 API。**
+LangGraph 在 **10-22** 合入 `Priority`（beta），**10-23** 随 `langgraph-sdk 0.4.9` / `langgraph-cli 0.4.38` 发布：按 thread 分配 `priority`（-5~5）、`fairness_group`、`fairness_weight`（1~100），并在 `langgraph.json` 里声明 `priority` 段。
+→ **求职含义**："会写 agent"是入门，"能让 1000 个租户的 agent 在同一集群里不互相饿死"才是后端岗。这是**队列/公平调度**知识在 AI 场景的复用，面试可迁移性极强。
+
+**结论 3：上下文压缩从"省 token 的技巧"变成"要证明不伤任务成功率"的工程问题。**
+AG2 **v1.2.1（10-21）** 新增 `compaction_verifier` 扩展，衡量"压缩后 agent 的下一步动作是否变差"，而不只是省了多少 token；Pydantic AI **2.60.0（10-23）** 把压缩边界做成带信任模型的 `CompactionPart`（客户端提交的压缩项不能被无条件采信）。
+→ **求职含义**：能拿出"压缩前后任务成功率 / 工具调用正确率 / TTFT / 成本"四项对比的项目，远胜"我做了个 RAG 聊天机器人"。
+
+**结论 4：协议层的竞争点从"能不能互通"转向"失败恢复与安全边界"。**
+A2A Python **1.2.3（10-19）** 修的是 SSRF（拒绝指向内网/共享地址空间的 push URL）、取消后流生产者泄漏；AG-UI 在 **10-17\~10-21** 连发多版，核心是**审批恢复（approval recovery）与 durable resume**；GitHub Agentic Workflows **v0.92.5** 把 MCP 编译默认改成**只读**，除非显式开启写工具。
+→ **求职含义**："agent 平台的失败恢复、幂等、权限沙箱"已是可面试的具体知识点，不再是空话。
+
+**结论 5：Agent 可观测性完成"标准化"这一步。**
+Grafana **10-22** 宣布 Agent Observability **GA 并支持 OpenTelemetry**（同时 Watchers GA、Managed Sandboxes/Pages 预览）。
+→ **求职含义**：把 agent 的 span 和普通微服务 trace 放进同一条 OTel 管道，是"能上线"的分水岭；会写 `gen_ai.*` 语义属性、会做成本归因的应届生非常少。
+
+---
+
+## 2. 重点进展（8 条，按"应用价值 × 求职价值 × 可信度 × 时效性"排序）
+
+### 2.1 OpenAI Decisions API 正式可用：把"判断"做成只吃输入 token 的端点
+
+{% table %}
+- 项
+- 内容
+---
+- 类别
+- 模型 API / 任务专用端点
+---
+- 日期
+- **2026-10-22（GA）**；2026-10-06 起 public beta；2026-09-29 DevDay 首次亮相
+---
+- 状态
+- 正式发布（GA）；实现细节 🟡 二手交叉验证
+---
+- 来源
+- マイナビニュース 2026-10-23（https://news.infoseek.co.jp/article/mynavi_3239456/）；Apidog 2026-10-10（https://apidog.com/blog/openai-decisions-api/）
+{% /table %}
+
+**具体变化（事实层）**
+
+- 端点 `POST https://api.openai.com/v1/decisions`，目前只支持模型 `gpt-6-luna`。
+- 请求字段只有四个：`model`、`input`（字符串，或 `input_text`/`input_image` 混排数组）、`questions[]`（每项含 `type` / `instructions` / 可选 `name`）、可选 `safety_identifier`（≤128 字符）。
+- 三种问题类型：`predicate` → 0~1 的 `probability`；`choice` → `choice` + 每项 `probabilities` + `confidence`（选项 2~255 个，`value` 可为 string 或 boolean）；`score` → 在有序 `levels` 上给分布。
+- 响应没有 `id`、没有生成文本，只有 `answers[]` 与 `usage`；`output_tokens` 为 0。
+- 相比 beta 的扩展：**prompt caching 复用公共输入**、**直接传 JSON 结构化数据**、**按问题挂图片**、单请求问题数 **200 → 400**。
+- **不存在**的参数：`temperature`、`reasoning`、`stream`、`store`、`tools`、`text.format`。
+- 价格（beta 期，🟡）：**$0.10 / 1M input tokens**，无 output / cache-read / cache-write 费用。
+- 厂商口径（🟡）：同一模型走 Responses API 时，Decisions 的判定**最高快 10 倍**。
+
+**为什么这是应用工程问题**
+
+传统做法：拼 prompt → 要求 JSON → 解析 → 校验失败重试。链路里有三个隐藏成本：输出 token 费用、解码延迟、**解析失败的重试放大**（一次失败常要重发整个上下文）。Decisions 把"判定"变成一次前向：没有输出 token、没有 JSON 解析、概率可直接用于**阈值化与人工兜底**。
+
+**怎么用（可直接复制，Python 3.11+ / httpx）**
+
+```python
+# decisions_router.py —— 用"判定端点"做客服工单路由 + 低置信度兜底
+import os, httpx
+
+URL = "https://api.openai.com/v1/decisions"
+HEADERS = {"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"],
+           "Content-Type": "application/json"}
+
+payload = {
+    "model": "gpt-6-luna",
+    "input": "I was charged twice for my order #A1932, please refund.",
+    "questions": [
+        {"type": "choice", "name": "department",
+         "instructions": "Which team should handle this ticket?",
+         "choices": [{"value": "billing"}, {"value": "technical"},
+                     {"value": "shipping"}, {"value": "other"}]},
+        {"type": "predicate", "name": "needs_human",
+         "instructions": "Does this require a human agent before any automated reply?"},
+        {"type": "score", "name": "urgency",
+         "instructions": "How urgent is this ticket?",
+         "levels": [{"label": "low"}, {"label": "normal"}, {"label": "high"}]},
+    ],
+}
+
+with httpx.Client(timeout=10.0) as c:
+    r = c.post(URL, headers=HEADERS, json=payload)
+    r.raise_for_status()
+    data = r.json()
+
+answers = {a["name"]: a for a in data["answers"]}
+dept, conf = answers["department"]["choice"], answers["department"]["confidence"]
+
+# 关键工程动作：低置信度不硬路由，落到人工/兜底队列
+if conf < 0.75 or answers["needs_human"]["probability"] > 0.5:
+    dept = "human_review"
+
+print(dept, conf, data["usage"])
+```
+
+**面试怎么讲（🔵 观点）**
+
+- 一句话定位："Decisions 是**分类/闸门**端点，不是聊天端点。它把输出侧成本压到 0，把不确定性变成概率，让后端能写 `if p < 0.75: 转人工`。"
+- 追问 1："为什么不用 function calling 强制 JSON？" → 仍要付输出 token + 解析 + 重试；且 function calling 给的是离散枚举，没有校准概率用于阈值。
+- 追问 2："批量判定成本怎么算？" → 同一 `input` 下 N 个问题共享一次输入计费（🟡），所以按"输入复用率"设计批处理：同一张图/同一段日志，一次问 5 个判定。
+- 风险（主动说）：单一模型、无流式、无工具、GA 定价未核实；强依赖前先 A/B，保留 fallback 到 `responses` + structured outputs。
+
+**作品集方向**：`ticket-router` —— Decisions 做 3 路分类 + 置信度门限 + 人工队列，附"成本/延迟 vs 传统 JSON prompt"对比脚本。
+
+---
+
+### 2.2 LangGraph `Priority`（beta）：给多租户 agent 加"优先级 + 公平队列"
+
+{% table %}
+- 项
+- 内容
+---
+- 类别
+- Agent 运行时 / 调度
+---
+- 日期
+- PR **2026-10-22** 合入；`langgraph-sdk==0.4.9`、`langgraph-cli==0.4.38` **2026-10-23** 发布
+---
+- 状态
+- **Beta**（构造对象会发 `LangGraphBetaWarning`）
+---
+- 来源
+- https://github.com/langchain-ai/langgraph/pull/9392 ；https://github.com/langchain-ai/langgraph/releases
+{% /table %}
+
+**具体变化**
+
+新增 `Priority` 对象，声明方式与 `Auth` / `Encryption` 一致：项目里定义对象，由 `langgraph.json` 的 `priority` 段引用。核心语义：
+
+- `@priority.assign` 注册**一个** async 函数（重复注册抛 `DuplicateHandlerError`），入参是 `PriorityContext`（frozen dataclass）。
+- `PriorityContext` 暴露：user 与 permissions、thread id（run 自建 thread 时为 `None`）、thread metadata、assistant id 与 graph id、assistant/run metadata、触发本次 run 的 cron id。
+- 返回 `PrioritySettings`，三个可选键：
+  - `priority`：**-5 \~ 5**，5 最先执行；
+  - `fairness_group`：非空字符串，**明文存储**（官方明确提示别放个人信息，用不透明 ID）；
+  - `fairness_weight`：**1 \~ 100**。
+- 缺省/`None` → `0`、`"default"`、`1`。
+- **只在 thread 的第一次 run 调用**，结果存到 thread 上；同一 thread 后续 run 复用存储值。
+
+**为什么这是应用工程问题**
+
+SaaS 里 agent 的 run 不等价：付费用户的深度研究不能被免费用户的批量任务堵住；批处理不该抢占交互式请求。过去这层要么在网关自己搓队列，要么给不同租户分实例（贵）。现在调度语义进了运行时，**按 thread 打标签**由平台侧执行。
+
+**最小示例**
+
+```python
+# priority.py
+from langgraph_sdk import Priority, PriorityContext, PrioritySettings
+
+priority = Priority()
+
+@priority.assign
+async def assign(ctx: PriorityContext) -> PrioritySettings | None:
+    perms = set(ctx.permissions or [])
+    if "premium" in perms:
+        return {"priority": 3, "fairness_group": "paid", "fairness_weight": 4}
+    if "batch" in perms:
+        # 批处理：低优先级，但用独立公平组保证不被完全饿死
+        return {"priority": -2, "fairness_group": "batch", "fairness_weight": 1}
+    return {"priority": 0, "fairness_group": "free", "fairness_weight": 1}
+```
+
+```bash
+pip install "langgraph-sdk==0.4.9"
+pip install "langgraph-cli==0.4.38"        # 或 npm i -g @langchain/langgraph-cli@0.4.38
+# 在 langgraph.json 增加 priority 段指向 priority.py 的 priority 对象（beta，schema 以 CLI 模板为准）
+langgraph dev
+```
+
+**坑（文档没写、但一定会踩）**
+
+- `fairness_group` 明文存储 → 别塞邮箱/租户名，用 `tenant_ab12` 这类不透明 ID。
+- 只在**首次 run** 求值 → 用户升级会员后已有 thread 不会自动提权，需重建 thread 或迁移。
+- 优先级只影响**排队**，不影响单次 run 的 token 预算；预算控制要另做（见 2.3）。
+- 本地 `langgraph dev` 与托管部署调度行为可能不同，压测必须在目标环境做。
+
+**作品集方向**：`agent-fair-queue` —— 三档租户共用一个 graph，Locust 打 200 并发，产出"等待时间 p50/p95 按档位"的图，证明 batch 不饿死、paid 不被拖慢。
+
+---
+
+### 2.3 Pydantic AI 2.60.0：模型选择器拿到"预算、截止时间、run_id"
+
+{% table %}
+- 项
+- 内容
+---
+- 类别
+- Agent 框架 / 成本治理
+---
+- 日期
+- **2026-10-23**（`v2.60.0`）
+---
+- 状态
+- 正式发布（含兼容性变更）
+---
+- 来源
+- https://github.com/pydantic/pydantic-ai/releases/tag/v2.60.0 ；PR https://github.com/pydantic/pydantic-ai/pull/10856
+{% /table %}
+
+**具体变化**
+
+`ModelSelectionContext`（`SelectModel` capability 或 `AbstractCapability.get_model()` 的入参）新增四个字段：`usage_limits`、`deadline`、`run_id`、`conversation_id`，与 `RunContext` 同名同义。为让第 1 步选择器拿到同样的值，`Agent.iter` 现在**先**解析 run 的 ID、deadline、usage limits，**再**执行第 1 步选择器。
+
+同批发布的相关项：
+
+- `SummarizingCompaction` 把 harness 注入的用户侧内容折叠为 `<harness_data>`，而不是伪装成用户消息（防止压缩把系统注入内容洗成用户意图）。
+- MCP capability 的默认 `id` 只取 server URL 的 hostname；同一 host 上两个 server 必须显式给 id，否则报错。
+- `RetryPromptPart` 弃用，改用 `ToolReturnPart(outcome='retried')` + `RetryFeedbackPart`（工具重试语义显式化）。
+
+**兼容性风险（必须知道）**
+
+- `timeout=` 的计时现在**包含第 1 步选择器耗时**：选择器里做慢 I/O 可能让本来能跑完的 run 抛 `RunTimedOut`。官方建议 `get_model()` 保持轻量，I/O 放 async selector。
+- DBOS 持久化工作流若在第 1 步选择器里跑 DBOS step，升级后恢复旧 workflow 会 `DBOSUnexpectedStepError`；无 `timeout` 时 run_id 形态也会变（`wf:2` → `wf:1`）。
+
+**最小示例**
+
+```python
+# budget_router.py —— 截止时间 + 租户档位双约束下的模型降级
+from dataclasses import dataclass
+from pydantic_ai import Agent, ModelSelectionContext
+from pydantic_ai.capabilities import SelectModel
+
+@dataclass
+class Deps:
+    tier: str  # "free" | "paid"
+
+CHEAP, STRONG = "openai:gpt-6-luna", "openai:gpt-6-sol"  # 换成你账号可用的模型 ID
+
+def select_model(ctx: ModelSelectionContext[Deps]) -> str:
+    # 1) 截止时间约束：剩余不足 5s 就降级，保证 SSE 不断流
+    if ctx.deadline is not None:
+        remaining = ctx.deadline.remaining()
+        if remaining is not None and remaining.total_seconds() < 5:
+            return CHEAP
+    # 2) 预算约束：结合 ctx.usage + ctx.usage_limits 判断（字段以安装版本为准）
+    # 3) 档位路由
+    return STRONG if ctx.deps.tier == "paid" else CHEAP
+
+agent = Agent(deps_type=Deps, capabilities=[SelectModel(select_model)])
+```
+
+> ⚠️ `UsageLimits` 的字段名（如 `request_limit` / `total_tokens_limit`）请以 `pip show pydantic-ai` 对应版本的类型定义为准；**能确认存在的是** `ctx.usage_limits`、`ctx.deadline`、`ctx.usage`、`ctx.run_id`、`ctx.conversation_id`、`ctx.step`、`ctx.retry`/`ctx.max_retries`、`ctx.deps`。
+
+**为什么是应用工程问题**
+
+"成本失控"最常见形态不是单价高，而是**所有请求都打最贵的模型**。把预算/截止时间暴露给选择器后，路由策略可写成纯函数并单测：给定 `(tier, step, usage, deadline)` → 断言选中的模型 ID。这是后端同学最容易做出"可验证成果"的地方。
+
+**面试追问**：为什么在"每一步"选而不是"每次请求"选？→ 工具调用会产生多个 model step，长任务的预算是在 step 之间被消耗的；只在入口选一次无法中途降级。
+
+**作品集方向**：`model-router` —— 纯函数路由 + 10 个场景单测 + "成本/质量"帕累托图（两模型各跑 50 条评测集）。
+
+### 2.4 AG2 v1.2.1：给"上下文压缩"加验收指标，给"MCP 工具调用"加锁
+
+{% table %}
+- 项
+- 内容
+---
+- 类别
+- Agent 框架 / 上下文工程 + 工具安全
+---
+- 日期
+- **2026-10-21**（`v1.2.1`）
+---
+- 状态
+- 正式发布（含升级注意项）
+---
+- 来源
+- https://github.com/ag2ai/ag2/releases/tag/v1.2.1
+{% /table %}
+
+**具体变化**
+
+- 新增 `compaction_verifier` 扩展：衡量某个 `CompactStrategy` 是否让 agent 的**下一步动作变差**，而不只是统计省了多少 token。这是把"压缩"从经验调参变成可回归的工程指标。
+- **MCP 工具调用被钉在发现时所使用的配置上**：`Variable(default_factory=...)` 不能再把一次调用路由到"另一个 server"，即工具名 → server 的绑定在发现阶段固定，堵住一类"工具混淆/路由劫持"问题。
+- ACP 与 network 层保留**多模态输入分段**（以前非文本 part 会被拍平成文本）。
+- Mistral 语音（离线 + 实时 STT、TTS）；依赖迁移到 `mistralai>=3.2,<4`（改用 **httpx2**，`MistralConfig.async_client` 类型变化）。
+- 其他：`OpenAIResponsesConfig` 支持 `reasoning`（effort/summaries）、新增 Firecrawl/Keenable 检索 toolkit、SQLite/Redis 知识库追加的原子性修复。
+
+**为什么这是应用工程问题**
+
+压缩策略一旦上线就是"全局默认"，出错时表现为"agent 突然变笨"，但日志里只看到 token 变少——没有验收指标就无从归因。另一面，MCP 工具名是全局字符串，多 server 场景下"同名工具"与"动态配置"是真实的越权面。
+
+**可直接抄的"压缩验收"骨架（不依赖 AG2 内部 API）**
+
+```python
+# compaction_gate.py —— 任何 CompactStrategy 上线前必须过的四道闸
+import json, statistics
+
+def measure(compact, history, tasks, run_agent):
+    rows = []
+    for t in tasks:
+        hist = history(t)                      # 原始长历史（含关键事实）
+        before = run_agent(hist, t.question)    # 未压缩基线
+        after = run_agent(compact(hist), t.question)
+        rows.append({
+            "task": t.id,
+            "success_before": before.ok, "success_after": after.ok,
+            "tool_ok_before": before.tool_ok, "tool_ok_after": after.tool_ok,
+            "ttft_before_ms": before.ttft_ms, "ttft_after_ms": after.ttft_ms,
+            "tokens_before": before.prompt_tokens, "tokens_after": after.prompt_tokens,
+        })
+    s = lambda k: statistics.mean(1 if r[k] else 0 for r in rows)
+    return {
+        "success_delta": s("success_after") - s("success_before"),  # 必须 >= -0.02
+        "tool_delta": s("tool_ok_after") - s("tool_ok_before"),      # 必须 >= 0
+        "token_saving": 1 - sum(r["tokens_after"] for r in rows) / sum(r["tokens_before"] for r in rows),
+        "ttft_delta_ms": statistics.mean(r["ttft_after_ms"] - r["ttft_before_ms"] for r in rows),
+    }
+
+# 上线门禁：success_delta >= -0.02 且 tool_delta >= 0 且 token_saving >= 0.3
+```
+
+**面试可讲的点**：压缩有三个反直觉 failure mode ——（1）把工具目录/能力声明压掉，导致模型"忘记自己能调什么"；（2）把 early system 约束压成摘要，模型开始违反格式；（3）摘要漂移在多轮后累积。AG2 的 verifier 正是针对第 1、3 点。
+
+---
+
+### 2.5 A2A Python 1.2.3：Agent 互调协议补上 SSRF 与流生命周期
+
+{% table %}
+- 项
+- 内容
+---
+- 类别
+- 协议与标准（Agent2Agent）
+---
+- 日期
+- **2026-10-19**（release 页；changelog 标注 10-17）
+---
+- 状态
+- 正式发布（patch）
+---
+- 来源
+- https://github.com/a2aproject/a2a-python/releases/tag/v1.2.3
+{% /table %}
+
+**具体变化（逐条都是上线后会疼的点）**
+
+- `server`：**拒绝指向共享地址空间的 push URL**（`#1326`）——A2A 的 push notification 本质是"让对方服务器回调你的 URL"，不校验就是标准 SSRF：攻击者把 push URL 指向 `169.254.169.254` 或内网服务，你的 agent 平台就变成内网探测器。
+- `server`：取消一条 stream 时，内部生命周期事件会被标记 done，**生产者不再泄漏**（`#1336`）——长连接 agent 最常见的线上事故是"客户端断开但后台还在生成、计费继续"。
+- `server`：push 通知失败与 task 生命周期**隔离**（`#1329`）——回调 500 不应该把任务判死。
+- `server`：直接 Message 响应后释放 `ActiveTask`；follow-up 消息在发送者的 `contextvars` 里执行（`#1317`）——多租户下 trace/tenant 上下文不串。
+- `client`：优先 1.0 接口时忽略 patch 版本；畸形 agent card 的解析错误标准化。
+- `compat`：v0.3 的 gRPC/REST 发送在未配置时会**阻塞**而不是静默失败；`history_length=0` 按"无限"处理。
+
+**一条能直接进仓库的回归测试**
+
+```python
+# tests/test_push_url_ssrf.py
+import pytest, httpx
+
+A2A_BASE = "http://127.0.0.1:9999"   # 你的 A2A server
+
+@pytest.mark.parametrize("url", [
+    "http://169.254.169.254/latest/meta-data/",   # 云元数据
+    "http://127.0.0.1:6379/",                     # 本地 redis
+    "http://10.0.0.5:8080/hook",                  # 内网
+    "http://[::1]:8000/hook",                     # IPv6 回环
+])
+def test_reject_internal_push_url(url):
+    r = httpx.post(f"{A2A_BASE}/tasks", json={
+        "message": {"role": "user", "parts": [{"kind": "text", "text": "hi"}]},
+        "pushNotificationConfig": {"url": url},
+    }, timeout=5)
+    assert r.status_code in (400, 403), f"{url} should be rejected, got {r.status_code}"
+```
+
+> 说明：不同实现的路径/字段名可能不同，测试断言的是**行为**（拒绝内网目标），不是具体 URL；接到真实 server 前先跑一次拿到 404 校准路径。
+
+**求职价值**：SSRF、超时与取消、幂等、回调隔离——这四个词在面后端时是硬通货，而 A2A 把它们放进了"agent 平台"的语境里，讲出来既新又扎实。
+
+---
+
+### 2.6 AG-UI 连发多版：Agent UI 的"审批恢复 + 断线续跑"成了默认能力
+
+{% table %}
+- 项
+- 内容
+---
+- 类别
+- 协议与标准 / 前端集成
+---
+- 日期
+- `2026-10-17 / 10-18 / 10-19 / 10-21` 连续发布
+---
+- 状态
+- 正式发布（多为 0.0.x / 1.x patch，接口仍在快速演进）
+---
+- 来源
+- https://github.com/ag-ui-protocol/ag-ui/releases
+{% /table %}
+
+**本周实际发布的包**
+
+{% table %}
+- 包
+- 版本
+- 日期
+- 关键变化
+---
+- `@ag-ui/claude-agent-sdk`
+- 0.0.8
+- 10-21
+- 审批恢复（approval recovery）；中断流前先持久化 deferred batch；不支持的 pending tool batch **保留并拒绝**而不是静默丢弃；子工具身份在恢复期保留
+---
+- `@ag-ui/claude-managed-agents`
+- 0.0.4
+- 10-21
+- 子结果跨首次运行与 reload 持久化；runtime context 跨 adapter 透传
+---
+- `@ag-ui/aws-strands`
+- 1.0.1
+- 10-19
+- durable resume 下的工具归属追踪；resume receipt 在终态前落盘
+---
+- `@ag-ui/a2ui-middleware`
+- 0.0.13
+- 10-19
+- 新增 `a2uiGenerationToolNames` 配置，区分"嵌套生成包装工具"与普通工具
+---
+- `ag_ui_adk` (Python)
+- 0.10.0
+- 10-18
+- 支持 Python 3.15；A2UI SDK 钉在 0.2.2；需要 `ag-ui-a2ui-toolkit>=0.0.5`
+{% /table %}
+
+**为什么这是应用工程问题**
+
+"人工审批"在 demo 里是一个弹窗，在生产里是**状态机**：用户可能关掉页面、网络断了、审批后工具结果丢了、重连时 agent 已经在跑下一步。AG-UI 这几版几乎全部在修这一类问题——审批恢复、批处理持久化、断线续跑、工具身份归属。
+
+**最小起步**
+
+```bash
+# Python 侧（ADK + AG-UI）
+pip install "ag_ui_adk==0.10.0" "ag-ui-a2ui-toolkit>=0.0.5"
+# TS 侧（Claude Agent SDK 适配器）
+npm i @ag-ui/claude-agent-sdk@0.0.8
+```
+
+**设计要点（🔵 观点）**
+
+1. 审批请求必须带 **correlation id**，恢复时按 id 找回 pending tool batch，不能靠"最后一条消息"。
+1. 前端代理工具调用（frontend-proxied tool）必须显式登记归属，否则断线恢复后无法判断这次调用该由谁执行（0.0.8/1.0.1 都在修这个）。
+1. 恢复要幂等：同一次审批重放不能产生两次副作用。
+
+---
+
+### 2.7 GitHub Agentic Workflows v0.92.1–0.92.5：CI 里的 agent 默认"只读 + 脱敏"
+
+{% table %}
+- 项
+- 内容
+---
+- 类别
+- Skills 与插件生态 / Agent 运维
+---
+- 日期
+- **2026-10-15 \~ 10-17** 连发 5 个预发布；周报 **2026-10-19**
+---
+- 状态
+- Pre-release（v0.92.x）
+---
+- 来源
+- https://github.github.io/gh-aw/blog/2026-10-19-weekly-update/
+{% /table %}
+
+**具体变化**
+
+- **MCP 编译默认只读**：除非显式启用写工具（`#69510`）。这是"agent 在 CI 里能改仓库"这件事的权限收口。
+- **发布前脱敏**：检测输出与 CLI 代理启动诊断在上传 artifact / 发 issue 前先 redact（`#69520`、`#69517`）——避免把 secret 写进公开 issue。
+- 结构化报告 AST（`#69756`/`#69755`）；子 agent 失败可见、不可用模型会被诊断（`#69788`/`#69467`）。
+- `create-issue: false` 可关闭自动建 issue；`--pr-message`、`--auto-merge`。
+- 引擎版本跟进：Copilot CLI 1.0.98、Codex 0.163.0、Gemini CLI 0.64.0、Goose 1.54.0、Kiro CLI 2.31.1、Antigravity CLI 1.3.6。
+- 依赖：MCP Gateway **v0.4.35**、firewall **v0.28.62**。
+
+**为什么值得看**
+
+这是"agent 进 CI/CD"最接近生产的公开实践：默认最小权限、产出前脱敏、失败可诊断、多引擎可切换。你要写"AI 代码审查/自动修 issue"类项目，这套策略可以直接借用。
+
+**可执行的检查清单**
+
+- 你的 agent workflow 是否有**写权限的最小化**（默认 `contents: read`，需要写时显式提权）？
+- 日志/PR 描述里是否会带出 `.env`、token、内部 URL？
+- 失败时是"静默重试"还是"结构化错误 + 归类"？
+- 是否把"模型不可用"与"代码有 bug"区分开？
+
+---
+
+### 2.8 Grafana Agent Observability GA + OpenTelemetry：agent 追踪并入标准管道
+
+{% table %}
+- 项
+- 内容
+---
+- 类别
+- 中间件与平台 / 可观测性
+---
+- 日期
+- **2026-10-22**（ObservabilityCON 2026）
+---
+- 状态
+- Agent Observability（含 OTel 支持）**GA**；Watchers **GA**；Managed Sandboxes、Pages **Preview**
+---
+- 来源
+- 厂商新闻稿（2026-10-22，中文转载：https://news.qq.com/rain/a/20261022A05HTF00）
+{% /table %}
+
+**事实（🟡 厂商口径，注意区分宣传与能力）**
+
+- Agent Observability 支持 OpenTelemetry，agent 活动可用与其他服务相同的开放标准呈现（GA）。
+- Assistant Watchers GA：用自然语言描述关注点，基于遥测学习"正常模式"，异常时给证据并走既有 Alerting。
+- Grafana Managed Sandboxes（public preview）：给 Assistant 受控云环境，可克隆仓库、结合生产遥测准备修复并开 PR。
+- 引用自家调查：约 **80%** 受访组织在开发/运行 LLM 功能，**45%** 自建 AI 可观测，仅 **25%** 用专用产品；**76%** 在 OTel 上投入。→ 这些是**厂商委托调查**，用来说明趋势可以，别当行业定论。
+
+**为什么这是应用工程问题**
+
+Agent 的成本与失败模式是"跨服务"的：一次回答可能经过网关 → 检索 → 3 次模型调用 → 2 个工具。没有统一 trace，你无法回答"这次为什么贵/为什么慢/为什么错"。OTel 的 `gen_ai.*` 语义约定把 model、token 数、tool 名变成 span 属性，成本归因才有可能。
+
+**最小落地（不依赖 Grafana，先跑通 OTel）**
+
+```bash
+pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+export OTEL_SERVICE_NAME=agent-api
+export OTEL_RESOURCE_ATTRIBUTES=deployment.environment=dev,service.version=0.1.0
+```
+
+```python
+# otel_span.py —— 给一次 agent 调用打上可归因的 span
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+trace.set_tracer_provider(TracerProvider())
+trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+tracer = trace.get_tracer("agent-api")
+
+def handle(req):
+    with tracer.start_as_current_span("agent.run") as span:
+        span.set_attribute("gen_ai.system", "openai")
+        span.set_attribute("gen_ai.request.model", "gpt-6-luna")
+        span.set_attribute("app.tenant.id", req.tenant_id)
+        span.set_attribute("app.run.id", req.run_id)
+        out = call_agent(req)
+        span.set_attribute("gen_ai.usage.input_tokens", out.usage.input_tokens)
+        span.set_attribute("gen_ai.usage.output_tokens", out.usage.output_tokens)
+        span.set_attribute("app.cost.usd", out.cost_usd)   # 自己算，别指望厂商
+        return out
+```
+
+**相关但独立的一条成本提醒**：LiteLLM 在 **10-21** 连发 `v1.106.2` / `v1.105.3` / `v1.104.5`，把 `batches` 的 **P0 成本/定价/翻译修复** 与 spend 跟踪修复 backport 到各 stable 分支（https://github.com/BerriAI/litellm/releases）。含义很直接：**网关的 batch 计费是会算错的**，成本看板必须与厂商账单对账，别只信网关自己的 spend 表。
+
+---
+
+## 3. 求职价值分级
+
+{% table %}
+- 级别
+- 内容
+- 判断依据
+---
+- **优先掌握**
+- ① Decisions API 的"判定端点"用法与成本结构；② 优先级/公平队列（LangGraph Priority 或自建）；③ 模型路由（预算 + 截止时间 + 降级）；④ 压缩验收指标；⑤ OTel `gen_ai.*` 追踪
+- 这五项都是"后端 + AI"交叉点，**能写代码、能出数字、能讲取舍**，且不依赖任何单一厂商；面试官听得懂，且能追问到底
+---
+- **值得了解**
+- A2A 1.2.3 的 SSRF/流生命周期修复；AG-UI 审批恢复与 durable resume；gh-aw 的只读默认与脱敏；AG2 的 MCP 工具钉定
+- 出现频率上升，但对应届生是"加分项"而非"必答项"；知道"为什么这么设计"即可，不必背 API
+---
+- **持续观察**
+- Grafana Managed Sandboxes/Pages；LiteLLM batch 计费修复；ADK 2.12 的 `after_tool_callback`；Gemini 4 Argon 的 API 参数收敛
+- 要么还在预览、要么与"个人项目可复现"距离较远；等到有免费额度或本地可跑再投入
+{% /table %}
+
+**为什么这样排**：招聘 JD 里出现频率最高的是"熟悉 RAG / Agent / 后端服务 / 可观测"，而不是"熟悉某个框架的最新 beta"。所以优先级按**可迁移性**排，不按新闻热度排。
+
+---
+
+## 4. 本周重点推荐（3 项）
+
+### 推荐 1：做一个"预算感知的模型路由层"（对应：AI 应用后端 / 平台工程）
+
+- **岗位方向**：AI 应用工程师、LLM 平台后端、Agent 基础设施。
+- **面试可能考**：多模型抽象怎么写？降级策略放在哪一层？如何避免"降级后质量崩"？如何做 A/B 与灰度？超时与重试如何不放大成本？
+- **可产出简历成果**：`model-router` 服务（FastAPI + 纯函数策略 + 单测 + 成本看板），README 里给出"路由前后成本 -X%、P95 延迟 -Y ms、任务成功率 -Zpp"的三行数字。
+- **为什么现在做**：Pydantic AI 2.60.0 刚好把 `deadline` / `usage_limits` / `run_id` 暴露给选择器，一周内可以做出"框架原生能力 + 你的策略层"的组合，叙事完整。
+
+### 推荐 2：给 agent 加"排队与公平性"（对应：后端 / 高并发服务）
+
+- **岗位方向**：后端开发、Agent 运行时、SaaS 平台。
+- **面试可能考**：优先级队列怎么实现？如何防饿死？公平性怎么度量？队列持久化与重启恢复？客户端断连如何取消任务？
+- **可产出简历成果**：`agent-fair-queue` —— 三档租户、200 并发压测、p50/p95 等待时间图、饿死测试用例。
+- **为什么现在做**：LangGraph 把 `priority`/`fairness_group`/`fairness_weight` 做成了公开 API，等于给了你一个"标准答案"可以对照实现（见第 7 节深潜 A）。
+
+### 推荐 3：做"上下文压缩的 A/B 验收"（对应：RAG / 上下文工程）
+
+- **岗位方向**：RAG 工程师、Agent 应用、评测平台。
+- **面试可能考**：压缩策略有哪些？怎么证明没伤效果？长会话怎么管理？工具目录丢失怎么办？客户端提交的历史能不能信？
+- **可产出简历成果**：`compaction-bench` —— 4 种策略（trim / summarize / provider-native / hybrid）× 30 条任务，输出成功率、工具正确率、token、TTFT 四张表；一条"低于阈值就阻止上线"的 CI 门禁。
+- **为什么现在做**：AG2 的 `compaction_verifier` 给了概念背书，Pydantic AI 的 `CompactionPart` 给了信任模型细节，两者都能写进设计文档（见第 7 节深潜 B）。
+
+## 5. 两小时行动清单（可本地跑通，产出可提交 GitHub）
+
+> 目标：两小时内得到 **3 个可运行脚本 + 1 张压测数字表 + 1 份 README**。前 90 分钟**不需要 API key**（用假模型），最后 30 分钟可选接入真实 key。
+
+### 0:00–0:10 建仓与环境
+
+```bash
+mkdir agent-eng-weekly && cd agent-eng-weekly
+git init
+python -m venv .venv
+# Windows: .venv\Scripts\activate     macOS/Linux: source .venv/bin/activate
+pip install "fastapi>=0.115" "uvicorn[standard]" pytest httpx
+pip freeze > requirements.txt
+mkdir -p app tests bench
+```
+
+预期产出：空仓库，并且 `python -c "import fastapi"` 不报错。
+
+### 0:10–0:45 任务 1：把"模型路由"写成纯函数 + 单测（不需要 key）
+
+文件 `app/router.py`：
+
+```python
+from dataclasses import dataclass
+
+CHEAP, STRONG = "model-cheap", "model-strong"
+
+@dataclass(frozen=True)
+class RouteInput:
+    tier: str                 # "free" | "paid"
+    step: int                 # 第几个 model step
+    tokens_used: int
+    token_budget: int
+    seconds_left: float | None
+
+def route(i: RouteInput) -> str:
+    """纯函数：任何输入都能单测，不碰网络。"""
+    if i.seconds_left is not None and i.seconds_left < 5:
+        return CHEAP                       # 先保命：别让 SSE 断流
+    if i.token_budget and i.tokens_used / i.token_budget > 0.7:
+        return CHEAP                       # 预算用掉 70% 就降级
+    if i.tier == "paid" and i.step <= 2:
+        return STRONG                      # 付费用户前两步用强模型
+    return CHEAP
+```
+
+文件 `tests/test_router.py`：
+
+```python
+from app.router import RouteInput, route, CHEAP, STRONG
+
+def test_deadline_wins():
+    assert route(RouteInput("paid", 1, 0, 1000, 3.0)) == CHEAP
+
+def test_budget_guard():
+    assert route(RouteInput("paid", 1, 800, 1000, 60)) == CHEAP
+
+def test_paid_first_steps_strong():
+    assert route(RouteInput("paid", 1, 0, 1000, 60)) == STRONG
+
+def test_free_always_cheap():
+    assert route(RouteInput("free", 1, 0, 1000, 60)) == CHEAP
+```
+
+```bash
+pytest -q
+```
+
+预期产出：`4 passed`。
+
+### 0:45–1:10 任务 2：公平队列模拟器，产出 p50/p95 数字
+
+文件 `bench/scheduler.py`：
+
+```python
+"""加权轮转 + 优先级分带的调度模拟：验证付费租户等待更短、批处理不被饿死。"""
+import asyncio, time
+from collections import deque
+from dataclasses import dataclass, field
+
+@dataclass
+class Job:
+    group: str
+    weight: int
+    enqueued: float = field(default_factory=time.perf_counter)
+    started: float | None = None
+    done: float | None = None
+
+class Band:
+    """同一优先级内的加权轮转。"""
+    def __init__(self):
+        self.q, self.w, self.left, self.order, self.rr = {}, {}, {}, [], 0
+    def push(self, g, weight, job):
+        if g not in self.q:
+            self.q[g], self.left[g], self.w[g] = deque(), weight, weight
+            self.order.append(g)
+        self.q[g].append(job)
+    def pop(self):
+        for _ in range(len(self.order)):
+            g = self.order[self.rr]
+            if self.q[g]:
+                if self.left[g] <= 0:
+                    self.left[g] = self.w[g]
+                job = self.q[g].popleft()
+                self.left[g] -= 1
+                if self.left[g] == 0 or not self.q[g]:
+                    self.left[g] = self.w[g]
+                    self.rr = (self.rr + 1) % len(self.order)
+                return job
+            self.left[g] = self.w[g]
+            self.rr = (self.rr + 1) % len(self.order)
+        return None
+
+class Scheduler:
+    def __init__(self):
+        self.bands = {}
+    def push(self, job, priority, group, weight):
+        self.bands.setdefault(priority, Band()).push(group, weight, job)
+    def pop(self):
+        for prio in sorted(self.bands, reverse=True):
+            job = self.bands[prio].pop()
+            if job:
+                return job
+        return None
+
+async def main(n_per_group=100, service_ms=40):
+    sched, jobs = Scheduler(), []
+    cfg = {"paid": (3, 4), "free": (0, 1), "batch": (-2, 1)}   # group -> (priority, weight)
+    for g, (prio, weight) in cfg.items():
+        for _ in range(n_per_group):
+            j = Job(g, weight)
+            sched.push(j, prio, g, weight)
+            jobs.append(j)
+
+    async def worker():
+        while True:
+            job = sched.pop()
+            if not job:
+                return
+            job.started = time.perf_counter()
+            await asyncio.sleep(service_ms / 1000)   # 模拟一次模型调用
+            job.done = time.perf_counter()
+
+    await asyncio.gather(*[worker() for _ in range(8)])
+    for g in cfg:
+        waits = sorted((j.started - j.enqueued) * 1000 for j in jobs if j.group == g)
+        p50, p95 = waits[len(waits) // 2], waits[int(len(waits) * 0.95) - 1]
+        print(g, "n=%d p50=%.1fms p95=%.1fms max=%.1fms" % (len(waits), p50, p95, waits[-1]))
+
+asyncio.run(main())
+```
+
+```bash
+python bench/scheduler.py
+```
+
+预期产出：`paid` 的 p95 明显低于 `free`，`batch` 的 max 有上界（没被饿死）。**把三个数字写进 README**——这就是简历上能写的量化结果。
+
+### 1:10–1:35 任务 3：FastAPI SSE + 客户端断开取消（无 key，假模型）
+
+文件 `app/main.py`：
+
+```python
+import asyncio, json
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+
+app = FastAPI()
+
+async def fake_llm(prompt: str):
+    for i in range(20):
+        await asyncio.sleep(0.1)
+        yield "chunk-%d" % i
+
+@app.get("/chat")
+async def chat(request: Request, q: str = "hi"):
+    async def gen():
+        async for c in fake_llm(q):
+            if await request.is_disconnected():   # 关键：停止生成 = 停止计费
+                break
+            yield "data: " + json.dumps({"delta": c}) + "\n\n"
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+# uvicorn app.main:app --port 8000
+# curl -N "http://127.0.0.1:8000/chat?q=hi"  然后 Ctrl+C，观察服务端是否立刻停止
+```
+
+预期产出：Ctrl+C 后 0.1s 内停止产出。**这就是"取消传播"的最小可演示证据。**
+
+### 1:35–1:50 任务 4：压缩验收干跑（不接模型也能跑通骨架）
+
+直接用 2.4 节的 `compaction_gate.py`，把 `run_agent` 换成返回固定结果的假函数，确认四项指标能算出来、门禁能拦住"成功率掉 5pp"的策略。
+
+### 1:50–2:00 README + 推送
+
+```bash
+python - <<'PY'
+open("README.md","w",encoding="utf-8").write("""# agent-eng-weekly
+
+2026-10-16~23 三个可运行实验：
+
+1. app/router.py —— 预算/截止时间感知的模型路由 + 4 条单测
+2. bench/scheduler.py —— 优先级分带 + 加权轮转，三档租户等待时间
+3. app/main.py —— SSE 流式 + 客户端断开取消
+
+## 本地跑
+pip install -r requirements.txt
+pytest -q
+python bench/scheduler.py
+uvicorn app.main:app --port 8000
+""")
+PY
+git add -A && git commit -m "feat: budget-aware router, fair scheduler bench, SSE cancel"
+```
+
+> 可选（有 key 时）：把 `fake_llm` 换成真实模型调用，记录 TTFT 与 tokens，把 README 的"预期"换成"实测"。
+
+---
+
+## 6. 简历与面试转化（3 个可落地小项目）
+
+> 说明：以下都是**建议你去做**的项目，不是你已经完成的经历。写简历时只写真正跑过、有数字的部分。
+
+{% table %}
+- 项目
+- 技术栈
+- 预计用时
+- 可展示成果
+- 可能被追问
+---
+- **A. 预算感知模型路由**
+- Python 3.12、FastAPI、Pydantic AI 2.60、pytest、Redis（可选计数）
+- 6–8 h
+- 路由策略纯函数 + 10 条单测；"成本 -38%、P95 -220ms、成功率 -1.2pp"三行数字；一张成本/质量帕累托图
+- 降级阈值怎么定？如何防降级抖动（hysteresis）？多租户预算怎么隔离？路由层如何灰度？
+---
+- **B. 多租户 agent 公平队列**
+- asyncio / Redis Streams、FastAPI、Locust
+- 8–10 h
+- 三档租户、200 并发、p50/p95 表 + 饿死测试；断连取消的演示 GIF
+- 优先级反转怎么处理？队列重启如何恢复？权重怎么定？公平性用什么指标（Jain 指数？max-min）？
+---
+- **C. 上下文压缩 A/B 平台**
+- Python、pydantic-ai 或任意 SDK、pandas、GitHub Actions
+- 8–12 h
+- 4 策略 × 30 任务矩阵；成功率/工具正确率/token/TTFT 四张表；CI 门禁（成功率跌 >2pp 即 fail）
+- 怎么造"必须记住早期信息"的任务？摘要漂移怎么检测？provider-native 与自建压缩怎么选？客户端提交的压缩项为什么要防？
+{% /table %}
+
+**面试自我介绍可用的一段话**：
+"我不做训练。我做的是把模型调用变成可运维的服务：路由、排队、压缩、追踪。比如我做过一个路由层，用预算和剩余时间做降级，成本降了 X%，代价是成功率掉了 Y 个百分点，我把这个权衡做成了可回归的评测。"
+
+---
+
+## 7. 技术深潜
+
+### 深潜 A：多租户 Agent 的优先级与公平调度（照着能写出来）
+
+#### A1. 问题定义
+
+一个 Agent 服务同时接三类流量：交互式付费用户（要求 P95 首字 < 3s）、免费用户（可等）、后台批处理（可跑几小时）。朴素做法是全局 FIFO：批处理一上来灌满队列，交互式请求排在 10 分钟后——**这不是"慢"，是 SLA 违约**。更糟的是长任务饿死短任务，重试进一步放大拥塞。
+
+要解决三个子问题：
+
+1. **优先级**：高优任务先执行；
+1. **公平性**：同优先级内各租户按权重分享吞吐，低权重组不被完全饿死；
+1. **可观测**：按租户/档位输出等待时间分布，否则无法证明"变好了"。
+
+#### A2. 方案与架构
+
+采用**优先级分带 + 带内加权轮转（WRR）**：
+
+```
+submit(job, priority, group, weight)
+        |
+        v
+  +-----------------------------+
+  | Band(+3)  Band(0)  Band(-2) |   优先级从高到低
+  +-----------------------------+
+        |  每带内部：group 轮转，每次给该组 weight 个名额
+        v
+   worker pool（N 个并发槽）
+        |
+        v
+  执行，记录 enqueue/start/done -> 输出每档 p50/p95
+```
+
+为什么不用"全局优先队列 + 数值优先级"？优先级只能表达"谁先"，无法表达"各租户按比例分享"，低权重租户会被持续压制。分带解决跨档，WRR 解决带内比例。
+
+**与 LangGraph Priority 的映射**（2.2 节）：`priority`（-5~5）→ band；`fairness_group` → group；`fairness_weight`（1~100）→ weight。自己实现一遍，就能理解托管运行时在做什么，面试时可对照讲。
+
+#### A3. 关键实现（完整可跑）
+
+```python
+# fair_queue.py —— 单进程骨架；多副本要把队列换成 Redis Streams + 租约
+import asyncio, time
+from collections import deque
+from dataclasses import dataclass, field
+
+@dataclass
+class Job:
+    payload: dict
+    group: str
+    weight: int
+    priority: int
+    enqueued: float = field(default_factory=time.perf_counter)
+    started: float | None = None
+    done: float | None = None
+
+class Band:
+    def __init__(self):
+        self.q = {}
+        self.weight = {}
+        self.left = {}
+        self.order = []
+        self.rr = 0
+
+    def push(self, job):
+        g = job.group
+        if g not in self.q:
+            self.q[g], self.weight[g], self.left[g] = deque(), job.weight, job.weight
+            self.order.append(g)
+        self.q[g].append(job)
+
+    def pop(self):
+        n = len(self.order)
+        for _ in range(n):
+            g = self.order[self.rr]
+            if self.q[g]:
+                if self.left[g] <= 0:
+                    self.left[g] = self.weight[g]
+                job = self.q[g].popleft()
+                self.left[g] -= 1
+                if self.left[g] == 0 or not self.q[g]:
+                    self.left[g] = self.weight[g]
+                    self.rr = (self.rr + 1) % n
+                return job
+            self.left[g] = self.weight[g]
+            self.rr = (self.rr + 1) % n
+        return None
+
+class FairScheduler:
+    def __init__(self):
+        self.bands = {}
+        self.cond = asyncio.Condition()
+        self.closed = False
+
+    async def submit(self, job):
+        async with self.cond:
+            self.bands.setdefault(job.priority, Band()).push(job)
+            self.cond.notify()
+
+    async def next_job(self):
+        async with self.cond:
+            while True:
+                for prio in sorted(self.bands, reverse=True):
+                    job = self.bands[prio].pop()
+                    if job:
+                        job.started = time.perf_counter()
+                        return job
+                if self.closed:
+                    return None
+                await self.cond.wait()
+
+async def worker(sched, handle):
+    while True:
+        job = await sched.next_job()
+        if job is None:
+            return
+        try:
+            await handle(job.payload)
+        finally:
+            job.done = time.perf_counter()
+
+async def run_demo():
+    sched = FairScheduler()
+    cfg = {"paid": (3, 4), "free": (0, 1), "batch": (-2, 1)}
+    async def handle(_):
+        await asyncio.sleep(0.02)
+    workers = [asyncio.create_task(worker(sched, handle)) for _ in range(8)]
+    jobs = []
+    for g, (prio, w) in cfg.items():
+        for i in range(100):
+            j = Job({"i": i}, g, w, prio)
+            jobs.append(j)
+            await sched.submit(j)
+    sched.closed = True
+    async with sched.cond:
+        sched.cond.notify_all()
+    await asyncio.gather(*workers)
+    for g in cfg:
+        waits = sorted((j.started - j.enqueued) * 1000 for j in jobs if j.group == g)
+        print(g, "p50=%.1fms p95=%.1fms" % (waits[len(waits) // 2], waits[int(len(waits) * 0.95) - 1]))
+
+if __name__ == "__main__":
+    asyncio.run(run_demo())
+```
+
+#### A4. 验证方式与常见坑
+
+**验证**
+
+1. 固定 200 个任务、8 个 worker、单任务 20ms，测三组 p50/p95；
+1. **饿死测试**：持续灌 `batch` 30s，断言 `paid` 的 p95 不超过基线 1.2 倍；
+1. **权重单调性**：weight 4:1 时，两组完成量比例应接近 4:1（±15%）；
+1. **取消**：断连后任务要么出队、要么被标记，别让 worker 白跑。
+
+**坑（每条都真实存在）**
+
+- **优先级反转**：低优任务持有唯一 DB 连接，高优任务排队等锁。解法：按档位隔离连接池/并发槽，别只隔离队列。
+- **重试放大**：失败任务以相同优先级重入队，会在拥塞时形成风暴。解法：指数退避 + 重试降档 + 幂等键去重。
+- **队头阻塞**：一个大任务占满 worker。解法：单任务最大执行时间 + 超时中断。
+- **多副本**：单进程调度器在多副本下失效，需要 Redis Streams / SQS + visibility timeout，"公平"改在消费端用令牌桶实现。
+- **权重热更新**：动态改 weight 会让 `left` 计数错乱，需在同一把锁内重算。
+
+---
+
+### 深潜 B：上下文压缩的可验证化（照着能写出来）
+
+#### B1. 问题定义
+
+长会话必然撞上下文上限。常见做法是"超过 N 条就摘要前 M 条"。问题是：**没人知道压缩之后 agent 是否还靠谱**。典型故障：
+
+- 压缩把"工具能力清单"删了 → 模型不再调用本可用的工具；
+- 压缩把早期强约束（"只输出 JSON"）折叠成一句模糊摘要 → 格式错误率上升；
+- 摘要是模型生成的，多轮压缩后**漂移**，事实被"改写"。
+
+#### B2. 方案与架构
+
+把压缩当成一次**发布**：有基线、有指标、有门禁。
+
+```
+长历史 H ---> [策略 S] ---> H' ---> Agent ---> 结果(ok/tool/tokens/ttft)
+                 |                                    |
+                 +--> tokens(H') ----------------------+
+                                                      |
+   基线：同任务用 H 跑一遍  <---------------------------+
+   门禁：success_delta >= -2pp 且 tool_delta >= 0 且 saving >= 30%
+```
+
+四种策略先都实现，别急着选：
+
+{% table %}
+- 策略
+- 做法
+- 优点
+- 风险
+---
+- trim
+- 丢最早的 N 条
+- 零成本、确定性强
+- 丢关键事实
+---
+- summarize
+- 用模型摘要旧段
+- 保留语义
+- 摘要漂移、额外调用成本
+---
+- provider-native
+- OpenAI / Anthropic 的压缩能力
+- 与 provider 缓存、计费对齐
+- 绑定 provider，跨 provider 失效
+---
+- hybrid
+- 先 trim 工具噪声，再摘要对话
+- 平衡
+- 实现复杂，需持续回归
+{% /table %}
+
+#### B3. 关键实现
+
+```python
+# compaction_bench.py —— 策略即插即用，指标可回归
+import statistics
+from dataclasses import dataclass
+
+@dataclass
+class Task:
+    id: str
+    history: list          # 早期埋了"关键事实"
+    question: str
+    expect_tool: str | None
+
+def trim_last_n(n):
+    return lambda h: h[-n:]
+
+def summarize(runner, keep_last=6):
+    def _apply(h):
+        old, recent = h[:-keep_last], h[-keep_last:]
+        summary = runner.summarize(old) if old else ""
+        head = [{"role": "system", "content": "SUMMARY: " + summary}] if summary else []
+        return head + recent
+    return _apply
+
+def run_suite(compact, tasks, runner):
+    rows = []
+    for t in tasks:
+        base = runner.answer(t.history, t.question)
+        comp = runner.answer(compact(t.history), t.question)
+        rows.append({
+            "ok_before": base.ok, "ok_after": comp.ok,
+            "tool_before": base.tool == t.expect_tool,
+            "tool_after": comp.tool == t.expect_tool,
+            "tok_before": base.prompt_tokens, "tok_after": comp.prompt_tokens,
+            "ttft_before": base.ttft_ms, "ttft_after": comp.ttft_ms,
+        })
+    def rate(k):
+        return sum(r[k] for r in rows) / len(rows)
+    return {
+        "n": len(rows),
+        "success_before": rate("ok_before"), "success_after": rate("ok_after"),
+        "tool_before": rate("tool_before"), "tool_after": rate("tool_after"),
+        "token_saving": 1 - sum(r["tok_after"] for r in rows) / sum(r["tok_before"] for r in rows),
+        "ttft_delta_ms": statistics.mean(r["ttft_after"] - r["ttft_before"] for r in rows),
+    }
+
+def gate(m, max_success_drop=0.02, min_saving=0.30):
+    assert m["success_after"] >= m["success_before"] - max_success_drop, "success dropped too much"
+    assert m["tool_after"] >= m["tool_before"], "tool calls got worse"
+    assert m["token_saving"] >= min_saving, "not saving enough tokens"
+    return True
+```
+
+**怎么造任务（关键）**：不要用真实聊天记录（不可复现）。用**合成针**：在历史第 2 条埋一个只有它才有的信息（订单号、工具名、格式约束），问题必须用到它。这样"压缩是否丢掉该信息"就是可判定的。
+
+#### B4. 验证方式与常见坑
+
+1. **至少 28 条任务**才有统计意义；每条跑 3 次取多数，降低采样噪声。
+1. **必须有负样本**：故意丢关键信息的策略应被门禁拦住，否则说明你的指标是假的。
+1. **按长度分层**：2k / 8k / 32k token 三档，压缩收益随长度非线性变化。
+1. **缓存效应**：压缩改变前缀会**打掉 provider 的 prompt cache**，可能"省了 token 却更贵"。必须同时记录 cache hit 与真实账单。
+
+**信任边界（来自 Pydantic AI 2.60 文档，务必内化）**：
+
+- 客户端提交的历史不可信；客户端提交的 `CompactionPart` **默认不能**用来隐藏服务端已存历史——否则客户端可伪造摘要，把真实上下文"压没"，等同于注入。
+- 只有当客户端传来的消息**就是全部会话**时才可考虑采信；而该 provider 的加密压缩项服务端无法检查内容，风险更高。
+- 结论：**压缩边界是安全边界，服务端持久化的历史优先。**
+
+**面试一句话**："压缩不是文本处理，是一次有状态迁移：要定义不变量（工具目录、系统约束、关键事实不可丢）、要有回归门禁、要考虑缓存与信任边界。"
+
+---
+
+## 8. 面试技术问答准备（6 题，附要点框架）
+
+**Q1. 判断类任务为什么不该用 chat completions + JSON？**
+
+- 成本结构：输出 token + 解析失败重试；判定端点只付输入。
+- 延迟：无解码；批量问题共享一次输入。
+- 可靠性：概率可阈值化，比"让模型输出枚举"更可控；但仍要 fallback。
+- 加分反问："你们分类任务 QPS 与单次输入长度大概多少？我可以估一下批处理收益。"
+
+**Q2. 1000 个租户共用一个 Agent 服务，怎么保证付费用户不被拖慢？**
+
+- 准入：按档位限流（令牌桶），先挡超量。
+- 排队：优先级分带 + 带内加权轮转；低优组独立公平组防饿死。
+- 执行：按档位隔离并发槽/连接池，避免优先级反转。
+- 观测：按档位出 p50/p95 与队列深度；设 SLO 告警。
+- 兜底：过载时**降级模型**而不是直接拒绝（配合预算路由）。
+
+**Q3. 长会话上下文怎么管？**
+
+- 分层：短期窗口（最近 N 轮）+ 中期摘要 + 长期检索。
+- 压缩：trim / summarize / provider-native / hybrid，按任务类型选。
+- 验收：成功率、工具正确率、token、TTFT、cache hit 五项 + 门禁。
+- 安全：服务端历史优先，客户端压缩项不轻信。
+- 成本：压缩会打掉前缀缓存，要按账单验证。
+
+**Q4. A2A 的 push 回调有什么安全风险？**
+
+- SSRF：回调 URL 指向内网/云元数据 → 地址空间校验 + DNS rebinding 防护 + 出网代理。
+- 重放：签名 + 时间戳 + nonce。
+- 可用性：回调失败不能影响任务状态（隔离）；重试队列 + 死信。
+- 资源：取消要释放生产者，避免"客户端走了还在烧钱"。
+
+**Q5. Agent 可观测怎么做？和普通微服务有什么不同？**
+
+- 相同：trace/metrics/logs，OTel 语义约定。
+- 不同：span 要带 `gen_ai.*`（model、token、tool）；一次任务跨多次模型调用，需要 run_id / conversation_id 串联。
+- 成本归因：按租户/模型/工具聚合；网关 spend 要与厂商账单对账（LiteLLM 的 batch 计费 bug 就是例子）。
+- 闭环：线上 trace 采样 → 离线回放 → 回归集。
+
+**Q6. SSE 流式接口，客户端断开后服务端该做什么？**
+
+- 检测 `request.is_disconnected()`（或框架等价物），取消上游生成。
+- 取消要传播到模型调用与工具执行，释放并发配额。
+- 幂等：已产生的副作用不能重放；用 idempotency key。
+- 计费：明确停止计费点（已产生 token 仍会计费，需在边界处截断）。
+- 观测：记录 cancel 率，异常升高说明前端/网络有问题。
+
+---
+
+## 9. 持续观察（下周重点盯这些信号）
+
+{% table %}
+- 方向
+- 具体信号
+- 为什么值得盯
+---
+- MCP 规范
+- 2026-07-28 版"stateless core"的落地进度、SDK 2.x 采用率、工具注解与权限模型变化
+- 协议是工具生态的地基；stateless 化会改变 server 部署与鉴权方式
+---
+- A2A
+- v1.2.x 后续是否继续补安全（SSRF / 重放）、push 配置是否引入签名机制
+- 多 agent 互调上生产后，安全补丁节奏就是采用率信号
+---
+- AG-UI
+- 0.0.x → 1.0 的稳定性、审批恢复是否有正式规范、A2UI 中间件采用
+- 前端 agent 集成的事实标准候选
+---
+- LangGraph Priority
+- beta → GA、langgraph.json schema 定稿、托管环境是否默认启用
+- 决定"调度"是否成为框架内建能力
+---
+- Pydantic AI
+- 3.0 是否有 breaking、压缩默认策略、MCP 多 server 命名治理
+- 路由/压缩 API 趋稳，值得押注
+---
+- 可观测
+- OTel `gen_ai.*` 语义约定是否 stable、厂商对 agent 成本的建模
+- 决定"成本可观测"能否标准化
+---
+- 岗位 JD 关键词
+- "Agent 平台"、"LLM Gateway"、"上下文工程"、"评测"、"SSE/流式"、"多租户"
+- 出现频率上升 = 技能溢价；把 JD 原词写进简历
+---
+- 模型 API
+- Decisions 类端点的跟进者（Jev、Perplexity、Cloudflare 等）、GA 后定价
+- 判断"任务专用端点"是不是长期趋势
+{% /table %}
+
+**下周如果只能看一件事**：盯 LangGraph Priority 是否 GA + 托管侧文档是否补齐。它决定"调度层"会不会变成 agent 框架的标配——这直接决定你要不要现在就学。
+
+---
+
+## 附录 A. 本周来源清单（可逐条核对）
+
+{% table %}
+- \#
+- 来源
+- 日期
+- 用于
+---
+- 1
+- https://news.infoseek.co.jp/article/mynavi_3239456/ （マイナビニュース）
+- 2026-10-23
+- Decisions API GA
+---
+- 2
+- https://apidog.com/blog/openai-decisions-api/
+- 2026-10-10
+- Decisions 字段与定价（beta）
+---
+- 3
+- https://github.com/langchain-ai/langgraph/pull/9392
+- 2026-10-22
+- Priority API 细节
+---
+- 4
+- https://github.com/langchain-ai/langgraph/releases
+- 2026-10-23
+- sdk 0.4.9 / cli 0.4.38
+---
+- 5
+- https://github.com/pydantic/pydantic-ai/releases/tag/v2.60.0
+- 2026-10-23
+- 版本变更
+---
+- 6
+- https://github.com/pydantic/pydantic-ai/pull/10856
+- 2026-10-21
+- ModelSelectionContext 字段
+---
+- 7
+- https://github.com/ag2ai/ag2/releases/tag/v1.2.1
+- 2026-10-21
+- compaction_verifier / MCP 钉定
+---
+- 8
+- https://github.com/a2aproject/a2a-python/releases/tag/v1.2.3
+- 2026-10-19
+- SSRF / 流生命周期
+---
+- 9
+- https://github.com/ag-ui-protocol/ag-ui/releases
+- 2026-10-17~21
+- 适配器与恢复语义
+---
+- 10
+- https://github.github.io/gh-aw/blog/2026-10-19-weekly-update/
+- 2026-10-19
+- v0.92.x 变更
+---
+- 11
+- https://news.qq.com/rain/a/20261022A05HTF00 （Grafana 新闻稿转载）
+- 2026-10-22
+- Agent Observability GA
+---
+- 12
+- https://github.com/BerriAI/litellm/releases
+- 2026-10-21
+- batch 计费与 spend 修复
+{% /table %}
+
+## 附录 B. 本周被排除的内容（以及为什么）
+
+{% table %}
+- 内容
+- 日期
+- 排除原因
+---
+- Gemini 4 Argon 发布
+- 2026-10-13
+- 超出 7 天窗口；内容偏能力/基准，应用侧参数变化待文档跟进
+---
+- Claude Haiku 5.5
+- 2026-10-07
+- 超出窗口
+---
+- Claude Duet（研究预览）
+- 2026-10-21
+- 消费端产品预览，非 API / 工程接口，参考价值有限
+---
+- Google ADK 2.12.0
+- 2026-10-13
+- 超出窗口（`after_tool_callback`、`require_confirmation` 值得下周补）
+---
+- NVIDIA Agent Toolkit / OpenShell
+- 本周
+- 厂商生态发布，缺少可复现的工程细节与定价，暂列观察
+---
+- 各类"最强模型"榜单
+- —
+- 营销与重复报道，无一手工程信息
+{% /table %}
+
+---
+
+*本报告由自动化周报流程生成：检索 → 一手源核对 → 去重 → 按应用/求职价值排序 → 可读化。所有版本号与日期均可在附录 A 的来源中核对；🟡 标记处为二手信息，请以官方文档为准。*

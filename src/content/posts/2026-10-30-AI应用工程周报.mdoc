@@ -1,0 +1,458 @@
+---
+title: 2026-10-30-AI应用工程周报
+description: >-
+  生成时间：20261031（Asia/Shanghai，补发 1030 期；1030 17:00 的定时触发未产出文件）
+  读者定位：计算机专业本科生，目标岗位为 AI 大模型应用工程师 / 后端开发 范围：只覆盖应用与后端工程视角；不含训练、微调、GPU 与推理引擎内核
+  口径：✅ 一手（GitHub Release /
+author: Kira
+publishDate: 2026-10-30
+zone: 编程
+tags:
+  - AI周报
+draft: false
+pinned: false
+---
+# AI 应用工程前沿周报（2026-10-23 ~ 2026-10-30）
+
+生成时间：2026-10-31（Asia/Shanghai，补发 10-30 期；10-30 17:00 的定时触发未产出文件）
+读者定位：计算机专业本科生，目标岗位为 AI 大模型应用工程师 / 后端开发
+范围：只覆盖应用与后端工程视角；不含训练、微调、GPU 与推理引擎内核
+口径：✅ 一手（GitHub Release / 官方文档 / 规范）；🟡 二手或厂商口径；🔵 我的判断
+
+---
+
+## 1. 本周摘要
+
+1. **Skills 第一次进入协议层，而不是只活在 IDE 插件里。** MCP TypeScript SDK v2.4.0（10-23）落地 SEP-2640「Skills over MCP」：server 用 `loadSkills(folder)` + `skills.attach(server)` 发布一个技能目录，client 用 `SkillsClient` 列举、读取、校验；在 2025-11-25 与 2026-07-28 两个规范版本上都可用，`attach` 标注为 experimental。
+   → 求职含义：Skill 从"提示词模板"变成"可分发、可校验的协议资源"，会写 skill + 会写 MCP server 的人开始吃同一份红利。
+1. **"判断"正在从 LLM 生成里拆出来，变成编排图上的一个节点。** Google ADK v2.13.0 新增 `TypesafeClassifier` / `ClassifierNode`，用 Jev 分类模型做工作流路由（一次前向返回校准概率）；AG2 v1.2.2 新增 `OpenAIDecisionsConfig`，把 Decisions 类端点接进 agent 配置。
+   → 求职含义：路由/分类不再靠"让模型输出一个词再解析"，而是"调分类器 + 设阈值 + 留兜底"，这是可写单测、可算成本的后端工作。
+1. **流式可靠性成为 SDK 的一等公民。** pydantic-ai 2.62~2.64（10-27~10-30）加入 `first_event_timeout`（流一直不开始就回退）、`ModelFallback` 可由 agent spec 构造；LangGraph 1.2.19（10-30）修了一批"流式事件归属/暂停工具被报成失败"的问题；A2A 1.3.0（10-27）让被中断挂起的任务在超时后被释放。
+   → 求职含义：SSE 不是 `yield` 就完事，"首字节超时 + 回退 + 取消 + 不重复输出"才是面试会追问的四连。
+1. **记忆与状态开始走"够用就好"的工程路线。** ADK 2.13 给出 `MongoDbSessionService`（跨副本共享会话）与 `MongoDbMemoryService`（不建向量索引，按关键词召回历史轮次），均标注 experimental。
+   → 求职含义：不是所有 RAG 都要向量库；能讲清"什么场景用关键词召回更划算"是加分项。
+1. **网关与可观测在数据层合流。** Langfuse v4.72.0（10-29）把 AI Gateway 的 span 归因到具体 gateway API key 与服务，并新增 Gateway 分析页；说明"成本归因"正在从自建脚本变成平台内建能力。
+   → 求职含义：成本归因、按 key/租户出报表，是可以直接写进简历的后端成果。
+
+---
+
+## 2. 重点进展
+
+### 1. MCP TypeScript SDK v2.4.0：Skills over MCP（SEP-2640）（协议 / Skills 生态 / 2026-10-23）
+
+- **具体变化**：新增 Skills 能力——server 端 `loadSkills(folder)` 载入技能目录、`skills.attach(server)` 挂到 server 上；client 端用 `SkillsClient` 列举、读取并校验技能。同时修了一批与 2026-07-28 规范对齐的行为。
+
+- **工程细节**：
+
+  - `x-mcp-header` 标注在 `number` 参数上会被拒绝：client 干脆不列这个工具，server 对该调用回 `-32020`；要用 `z.int()` 或去掉标注。
+  - 来自 `z.object(...).meta({ id })` 的 `outputSchema`，在 2025-11-25 连接上不再包一层 `{ result }`，读 `structuredContent` 而不是 `structuredContent.result`。
+  - 包版本：client/server/core/server-legacy/codemod 均 2.4.0，`@modelcontextprotocol/node` 2.1.2；express/hono/fastify 适配器未变。
+  - 附带：token refresh 可选 `scope`（`scopeForRefresh(tokens)`，解决 Entra ID 的 AADSTS90009）；`ServerEvent` 支持 `params` 以便网关透传 `_meta`。
+
+- **解决什么工程问题**：以前"技能"只能靠复制提示词或装插件，跨客户端无法复用、无法校验来源；现在技能是可发现、可读取、可校验的协议资源，天然支持版本化与供应链检查（谁发布的、内容是什么）。
+
+- **最小示例**（TypeScript，按 release 说明还原，细节以官方文档为准）：
+
+  import { McpServer } from "@modelcontextprotocol/server";
+  import { loadSkills } from "@modelcontextprotocol/server";
+
+  const server = new McpServer({ name: "team-skills", version: "0.1.0" });
+  const skills = loadSkills("./skills");   // 目录里每个 skill 一份说明 + 可选脚本
+  skills.attach(server);                   // experimental：小版本可能变
+
+- **实践方向**：把"周报生成""接口设计评审""SQL 审查"写成 3 个 skill，用一个 MCP server 发布；客户端只装一次，团队共用。
+
+- **来源**：GitHub modelcontextprotocol/typescript-sdk release v2.4.0（2026-10-23）；SEP-2640
+
+### 2. Google ADK v2.13.0：分类器节点 + MongoDB 会话/记忆（Agent 框架 / 2026-10-22，发布 10-23）
+
+- **具体变化**：
+
+  - 新增 `TypesafeClassifier` 与 `ClassifierNode`，用 Jev 分类模型做工作流路由；官方描述为"一次前向返回校准概率，比 LLM 快得多"（🟡 厂商口径）。
+  - 新增 `MongoDbSessionService`（会话存 MongoDB，跨 runner 副本共享）与 `MongoDbMemoryService`（不依赖 embedding，按关键词召回历史轮次），均 experimental。
+  - `MongoDbToolset` 可部署到 Agent Engine 而不打包连接串；Atlas Automated Embedding 支持服务端嵌入查询。
+  - Live Audio：支持 barge-in 的实时语音，配合 Gemini STT/TTS。
+  - 12 个成熟 experimental 特性转 stable；官方称字符串模型 agent 的执行轮次最高快 8 倍（🟡 厂商口径）。
+
+- **工程细节**：分类节点把"路由"变成图上的显式节点，概率可直接用于阈值与兜底分支；MongoDB 记忆服务不需要向量索引，意味着小团队可以先用现成数据库跑通长记忆。
+
+- **解决什么工程问题**：① 路由用 LLM 既慢又贵，且输出需要解析；分类器给的是概率，能写 `if p < 0.6: 转人工`；② 会话与记忆依赖外部服务时，副本扩容与故障恢复是硬问题，放数据库里更好运维。
+
+- **最小示例**（Python，结构示意）：
+
+  from google.adk.agents import LlmAgent
+  from google.adk.workflow import ClassifierNode   # 具体导入路径以 2.13.0 文档为准
+
+  router = ClassifierNode(
+  name="route",
+  labels=["billing", "technical", "other"],
+  thresholds={"billing": 0.6, "technical": 0.6},   # 低于阈值走 other
+  )
+
+- **实践方向**：把客服/工单类 agent 的入口从"LLM 判断意图"换成分类节点，对比成本、P95 与误路由率。
+
+- **来源**：GitHub google/adk-python release v2.13.0
+
+### 3. AG2 v1.2.2：工具超时 + Decisions 配置 + 更准的 token 账（Agent 框架 / 2026-10-27）
+
+- **具体变化**：
+  - `@tool(timeout=...)` 限制单次函数工具调用；`timeout=` 也支持 stream subscriber、`@observer`、`BaseObserver`、`LoopDetector`、`TokenMonitor`。超时的工具把 `TimeoutError` 回灌给模型，模型可以继续。
+  - 新增 `OpenAIDecisionsConfig`，支持 `question_instructions`（字符串、ag2 输入或 SDK parts），追加到 agent prompt。
+  - 支持 Anthropic SDK 2.x，`AnthropicConfig` 新增 typed `speed` 与 `open_telemetry`（可关掉 SDK 自带 span）。
+  - A2UI 升到 v1.0（含 `callAgentFunction` / `agentFunctionResponse`）；token 统计补齐 Anthropic continuation tokens、Gemini thinking tokens、xAI reasoning tokens，OpenAI `cache_write_tokens` 映射为 `cache_creation_input_tokens`。
+- **工程细节**：`OpenAIConfig` 被弃用，1.4.0 起变成 Responses API；要继续用 Chat Completions 请改用 `OpenAICompletionsConfig`。`AnthropicConfig` 的 `temperature`/`top_p`/`top_k` 在 1.4.0 前弃用（anthropic 2.x 会拒绝）。
+- **解决什么工程问题**：① 工具卡死会拖垮整条 run，超时把"挂起"变成"可继续的错误"；② token 账不准会直接导致成本看板失真，尤其是缓存写入与 reasoning token。
+- **实践方向**：给每个有外部 I/O 的工具设超时（如 8s），并统计"超时率"作为工具质量指标。
+- **来源**：GitHub ag2ai/ag2 release v1.2.2
+
+### 4. pydantic-ai 2.62~2.64：首字节超时回退、服务端状态归属、技能安全扫描（Agent 框架 / 2026-10-27 ~ 10-30）
+
+- **具体变化**：
+  - `first_event_timeout` 模型设置：流一直不开始就触发回退（配合 `ModelFallback`，后者现在可由 agent spec 构造）。
+  - `Model.accepts_server_state`：存下来的 response/item/conversation/container ID 只回传给创建它的端点，避免把 A 家的状态发给 B 家。
+  - `ArtifactScanner`：对 `Memory` 与 `Skills` 的产物做安全扫描。
+  - 重试传输最终失败时抛 `ModelHTTPError`，让 fallback 继续往下走；新增 `ModelRequestRejectedError`、`ModelAuthenticationError`、`ModelNotFoundError` 分类。
+  - hosted MCP 能力默认给工具名加服务前缀（`tool_prefix` 可配）；`SummarizingCompaction` 的摘要改为存成 `CompactionPart` 而非 system prompt。
+- **解决什么工程问题**：流式请求最怕"连接成功但永远不来第一个 token"，只设总超时会让用户干等；首字节超时把这类故障变成可回退的快速失败。服务端状态归属则防跨厂商串味（缓存/会话 ID 混用）。
+- **实践方向**：把"首字节超时 2s + 回退到备用模型"做成网关默认策略，并统计各 provider 的首字节分布。
+- **来源**：GitHub pydantic/pydantic-ai releases v2.62.0 / v2.63.0 / v2.64.0
+
+### 5. A2A Python v1.3.0：挂起任务超时释放 + 客户端隔离（协议 / 2026-10-27）
+
+- **具体变化**：
+  - server 端：被中断而"停靠（parked）"的任务在可配置超时后被释放（`#1338`）。
+  - client 端：未配置时每个 client 建独立 httpx 连接（`#1358`）；畸形 JSON-RPC 响应抛 A2A 错误（`#1375`）；未识别字段导致的拒绝（`#1354`）。
+  - 兼容层：v0.3 未设置的 status message/provider 保持 `None`；v0.3 适配器返回 A2A 错误码；存任务时写入 `last_updated`。
+  - 其他：状态事件校验失败后允许恢复；异常 `__repr__` 恢复结构化输出。
+- **工程细节**：parked task 不释放会一直占内存/会话槽，长跑集群里表现为"越跑越慢"；独立 httpx 则避免多租户共享连接池导致的头信息/超时串扰。
+- **解决什么工程问题**：任务生命周期与连接生命周期的资源泄漏——这两个是 agent 平台上线后最常见的"慢性病"。
+- **实践方向**：给你的 A2A server 加一个"parked 任务数"指标与超时释放告警。
+- **来源**：GitHub a2aproject/a2a-python release v1.3.0
+
+### 6. LangGraph 1.2.18 / 1.2.19：长线程快照频率与流式事件归属（Agent 运行时 / 2026-10-26、10-30）
+
+- **具体变化**：
+  - `DeltaChannel` 默认每 100 次更新打一次全量快照（原为 1000），长线程读取更快、存储更多；传 `snapshot_frequency=1000` 可保留旧行为。
+  - 修复：`trace_policy` 不再改写被流式输出的节点 payload；messages/tools 事件带上所属 graph 的 namespace；暂停的工具不再在 tools 流里被报成失败；`@task` 的返回值在流式时正确返回。
+  - 新增：graph 节点元数据里列出 `ToolNode` 的工具名（`#9449`）。
+- **工程细节**：`langgraph==1.2.19`、`langgraph-sdk==0.4.11`、`langgraph-checkpoint-sqlite==3.1.3` 同日发布；1.2.18 还修了 `interrupt_after`/递归上限中断时最后一个 checkpoint 不被流出的问题。
+- **解决什么工程问题**：长会话的恢复速度与存储成本是一对矛盾，快照频率是可调旋钮；流式事件归属错误会让前端把子图消息挂错到父图，表现为"UI 乱序/丢消息"。
+- **实践方向**：压测"10 万条消息的 thread"恢复耗时，对比 `snapshot_frequency` 100 / 1000 的读延迟与存储增量。
+- **来源**：GitHub langchain-ai/langgraph releases 1.2.18、1.2.19
+
+### 7. AG-UI release 2026-10-30：子 agent 可见性与用量归并（前端集成 / 2026-10-30）
+
+- **具体变化**：
+  - `@ag-ui/mastra@2.0.2`：`RUN_FINISHED` 携带 Mastra 的 finish reason（`metadata.mastra.finishReason`）；新增 `subagentVisibility: "hidden" | "attributed"`（默认 hidden），attributed 模式把每次 Mastra 委派映射成 AG-UI 1.0 的 subagent invocation；run usage 现在把被委派子 agent 的 token 用量累加进来。
+  - `@ag-ui/mcp-apps-middleware@0.1.3`、`@ag-ui/a2ui-middleware@0.0.14` 同日发布；.NET 侧 `AGUI.ClaudeManagedAgents@0.0.4` 修审批后的子结果恢复。
+- **工程细节**：默认 hidden 保证现有 UI 不改；attributed 需要前端能渲染嵌套调用。用量归并意味着"一次 run 的成本"终于包含子 agent，否则成本报表永远偏低。
+- **解决什么工程问题**：多 agent 的 UI 展示与计费归因——子 agent 的 token 过去经常"人间蒸发"。
+- **实践方向**：在 attributed 模式下把子 agent 的调用画成嵌套时间线，并核对总 token 与网关账单。
+- **来源**：GitHub ag-ui-protocol/ag-ui release/2026-10-30
+
+### 8. Langfuse v4.72.0：把 AI Gateway 的账算到 key 上（可观测 / 2026-10-29）
+
+- **具体变化**：ingestion 把 AI gateway span 归因到对应 gateway API key 与服务；self-host 实例上报 gateway 请求数；AI Gateway 设置页新增 analytics tab；evals 支持 trace 级过滤条件；告警/项目通知/prompt 变更可发 PagerDuty。
+- **工程细节**：归因依赖 span 上带 gateway 的 key/service 属性，意味着网关侧必须透传身份，否则报表里全是"unknown"。
+- **解决什么工程问题**：成本归因从"按模型"细化到"按调用方"，才能做配额、内部结算与滥用排查。
+- **实践方向**：给自建网关加 `gateway.key_id` / `gateway.service` 两个属性，验证 Langfuse 报表能按 key 拆分。
+- **来源**：GitHub langfuse/langfuse release v4.72.0
+
+---
+
+## 3. 求职价值分级
+
+**优先掌握（直接影响面试与作品集）**
+
+- Skills over MCP：会写技能目录、会挂到 server、会用 client 列举与校验（v2.4.0 已给出 API）。
+- 分类器路由：概率 + 阈值 + 兜底分支，能算成本与误路由率（ADK `ClassifierNode` / AG2 `OpenAIDecisionsConfig`）。
+- 流式可靠性：首字节超时、回退、取消传播、不重复输出（pydantic-ai `first_event_timeout` 的思路）。
+- 网关成本归因：按 key/服务/租户出账（Langfuse 4.72 的方向）。
+
+**值得了解**
+
+- A2A 任务生命周期：parked 超时释放、每 client 独立连接。
+- LangGraph 快照频率与流式事件 namespace：影响长会话恢复与前端正确性。
+- AG-UI 子 agent 可见性与用量归并：多 agent 产品的 UI/计费基础。
+- MongoDB 会话与关键词记忆：不用向量库的记忆方案。
+
+**持续观察**
+
+- `skills.attach` 何时转正（目前 experimental，小版本可能变）。
+- MCP 2026-07-28 规范的生态采用率（SDK 2.x 的对齐进度）。
+- 分类器模型的供应商格局（Jev、Decisions、其他跟进者）。
+- ADK MongoDB 服务何时从 experimental 转 stable。
+
+**判断依据**：优先掌握项必须同时满足"能当天写出代码 + 面试能深挖三层 + JD 里出现"；只在预览/实验阶段且无免费额度的，一律放持续观察。
+
+---
+
+## 4. 本周重点推荐
+
+**推荐一：用 MCP 发布一套团队 Skill（岗位：AI 应用工程师 / 平台）**
+
+- 面试考点：MCP 的 server/client 角色、技能如何被发现与校验、`x-mcp-header` 这类规范约束、experimental API 的升级风险。
+- 简历成果：一个 `team-skills` MCP server（3 个 skill）+ 一个列举/校验的 client + 一份"技能变更如何影响 agent 行为"的回归记录。
+
+**推荐二：把路由换成分类器 + 阈值（岗位：AI 应用 / 后端）**
+
+- 面试考点：为什么分类器比 LLM 路由便宜、概率如何校准、阈值怎么选、分类器挂了怎么兜底、如何防输入注入影响分类。
+- 简历成果：200 条标注集 + 阈值扫描曲线（覆盖率 vs 准确率）+ 成本/延迟对比表 + 一个"低于阈值转人工"的服务。
+
+**推荐三：流式网关的首字节超时与回退（岗位：后端 / 平台工程）**
+
+- 面试考点：SSE 与 WebSocket 取舍、首字节超时与总超时的区别、回退时机（首 token 前后）、取消传播、重复输出如何避免。
+- 简历成果：两 provider 的 SSE 网关，注入"首包延迟 5s"故障后自动切换，附 P95 首字节与切换成功率。
+
+---
+
+## 5. 两小时行动清单（可当天跑通）
+
+**0:00–0:15 环境**
+
+- 建 repo：skill-router。目录：`skills/`（技能）、`server/`、`router/`、`gateway/`、`evals/`。
+
+- Node 侧装 MCP SDK：
+
+  npm init -y
+  npm i @modelcontextprotocol/server@2.4.0 @modelcontextprotocol/client@2.4.0
+  npm i -D typescript tsx
+
+**0:15–0:45 发布一个 Skill**
+
+- 写 `skills/weekly-report/SKILL.md`：名称、触发条件、步骤、输出格式、禁止事项（5 分钟内能写完）。
+
+- 起 server 并挂技能：
+
+  // server/index.ts
+  import { McpServer, loadSkills } from "@modelcontextprotocol/server";
+  const server = new McpServer({ name: "team-skills", version: "0.1.0" });
+  loadSkills("./skills").attach(server);
+  await server.connect(process.env.MCP_TRANSPORT ?? "stdio");
+
+- 用 client 列举，确认能看到技能名与元数据（这是"可发现"的证据）。
+
+- 预期产出：终端打印出技能清单；截图或日志留存。
+
+**0:45–1:15 分类器路由 + 阈值**
+
+- 先不接真模型：写 `router/classify.py`，输入文本，输出 `{"label": ..., "p": ...}`；用 `evals/cases.jsonl`（20 条）跑阈值扫描：
+
+  for th in [0.5, 0.6, 0.7, 0.8]:
+  covered = [c for c in cases if max(c["p"].values()) >= th]
+  acc = sum(c["label"] == max(c["p"], key=c["p"].get) for c in covered) / max(len(covered), 1)
+  print(th, len(covered) / len(cases), acc)
+
+- 预期产出：一张"覆盖率 vs 准确率"表；挑一个阈值写进 README。
+
+**1:15–1:45 SSE 首字节超时 + 回退**
+
+- 起两个假 provider（一个正常、一个故意 sleep 5s 再返回），网关对首字节设 2s 超时：
+
+  first = await asyncio.wait_for(it.**anext**(), 2.0)
+
+- 预期产出：日志显示 A 超时 → B 接管 → 客户端只收到一份完整输出（无重复）。
+
+**1:45–2:00 收尾**
+
+- README 写：架构图、怎么跑、实测数字（首字节 P95、切换成功率、分类器覆盖率）、已知限制（技能 API 仍 experimental）。
+
+---
+
+## 6. 简历与面试转化
+
+**项目 A：团队 Skill 市场（技术栈：TypeScript + MCP SDK 2.4 + 一个 Web 列表页，8\~10 小时）**
+
+- 成果：3~5 个 skill 的 MCP server；client 端列举/校验；技能版本变更记录；一份"技能更新导致 agent 行为变化"的对比。
+- 可能追问：技能内容如何防注入？attach 是 experimental，升级怎么保证不炸？技能与工具（tool）边界怎么划？
+
+**项目 B：分类器路由服务（技术栈：Python + FastAPI + 任一分类端点/本地模型 + 标注集，6\~8 小时）**
+
+- 成果：阈值扫描报告、误路由案例分析、成本与 P95 对比（vs LLM 路由）、低于阈值转人工的兜底链路。
+- 可能追问：概率不校准怎么办？类别不平衡怎么评估？分类器超时/挂掉如何降级？如何防止用户输入里的指令影响分类？
+
+**项目 C：流式网关（技术栈：FastAPI + httpx + SSE，6\~8 小时）**
+
+- 成果：双 provider、首字节超时回退、取消传播、无重复输出；压测 50 并发下的首字节 P95。
+- 可能追问：为什么不能只在总超时上做文章？已经开始输出后失败怎么办？如何避免回退导致的双重计费？
+
+以上为建议方案，请按实际完成情况如实描述。
+
+---
+
+## 7. 技术深潜一：流式接口的首字节超时与故障转移
+
+**问题定义**
+流式请求有三种失败形态：连不上（好处理）、连上了但迟迟不来第一个 token（最难受）、输出到一半断了（不能切换）。只设总超时会让用户在 60 秒后发现失败；只做重试又可能在已经输出后重发，导致内容重复、双倍计费。
+
+**方案与架构**
+把"超时"拆成三个层次，并且只在第一个 token 之前允许切换 provider：
+
+[Client SSE] -> [Gateway]
+|-- 连接超时 1s         -> 换 provider
+|-- 首字节超时 2s        -> 换 provider（尚未向客户端写任何内容）
+|-- 总超时 60s           -> 终止并向客户端发 error 事件
+|-- 首字节后中断         -> 直接结束（禁止切换，避免重复）
+
+**关键实现**（可直接复制，Python 3.11+）
+
+\# gateway/failover.py
+import asyncio, httpx
+
+PROVIDERS = [
+("https://a.example.com/v1/chat", "model-a"),
+("https://b.example.com/v1/chat", "model-b"),
+]
+
+async def stream_with_failover(payload: dict, first_token_timeout: float = 2.0,
+total_timeout: float = 60.0):
+"""按顺序尝试 provider；一旦产出过 token 就不再切换。"""
+for url, model in PROVIDERS:
+emitted = False
+try:
+async with httpx.AsyncClient(timeout=total_timeout) as client:
+async with client.stream("POST", url, json={**payload, "model": model}) as r:
+r.raise_for_status()
+lines = r.aiter_lines()
+first = await asyncio.wait_for(lines.**anext**(), first_token_timeout)
+emitted = True
+yield first
+async for line in lines:
+yield line
+return
+except (asyncio.TimeoutError, httpx.HTTPError):
+if emitted:
+raise            # 已经输出过，切换会重复内容
+continue
+raise RuntimeError("all providers failed")
+
+对接 SSE 时，网关只做透传，并在首个 token 到达后才写响应头：
+
+@app.post("/chat")
+async def chat(req: ChatReq):
+async def gen():
+async for line in stream_with_failover(req.model_dump()):
+yield "data: " + line + "\n\n"
+return StreamingResponse(gen(), media_type="text/event-stream",
+headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+**验证方式与常见坑**
+
+- 验证：起两个假 provider（A 正常、B 先 sleep 5s），断言客户端只收到一份完整输出，日志里 A 超时、B 接管；再把 A 改成"发 3 个 token 后断开"，断言网关**不**切换而是结束。
+- 坑一：反代/网关缓冲。Nginx 默认会攒包，`X-Accel-Buffering: no` 与关闭 `proxy_buffering` 必须配。
+- 坑二：把心跳当首字节。很多服务会先发 `:\n\n` 或空 keepalive，首字节超时必须等"第一个真实内容 chunk"。
+- 坑三：回退导致双重计费。A 已经生成但网关超时放弃时，A 侧仍可能计费；要在 provider 侧带 `request_id` 并对账。
+- 坑四：客户端断开。回退逻辑必须同时监听 `request.is_disconnected()`，否则用户走了还在切换重试。
+
+---
+
+## 8. 技术深潜二：把"判断"从 LLM 生成里拆出来
+
+**问题定义**
+"这条工单属于哪个部门""这次回答要不要转人工"这类判断，用聊天模型做有三个成本：输出 token、解析失败重试、以及输出不稳定（同一输入两次不同标签）。分类器/判定端点把这些变成一次前向 + 概率。
+
+**方案与架构**
+
+请求 -> 规则层（黑白名单/长度/语言）
+-> 分类器（Jev / Decisions / 本地小模型）-> {label, p}
+-> 阈值: p >= 0.75 直接路由
+0.45 <= p < 0.75 走 LLM 复核（或更强模型）
+p < 0.45 转人工
+-> 记录 (label, p, 决策, 最终结果) 供校准与回归
+
+关键不是"换成分类器"，而是**保留一个可校准的中间带**：模型不确定时不要硬路由。
+
+**关键实现**（阈值扫描 + 校准检查，无需 API key）
+
+\# router/calibrate.py
+import json, collections
+
+def sweep(cases, thresholds=(0.5, 0.6, 0.7, 0.8, 0.9)):
+"""cases: [{"p": {"billing": 0.9, "tech": 0.1}, "label": "billing"}]"""
+rows = []
+for th in thresholds:
+covered = correct = 0
+confuse = collections.Counter()
+for c in cases:
+label, p = max(c["p"].items(), key=lambda kv: kv[1])
+if p < th:
+continue
+covered += 1
+if label == c["label"]:
+correct += 1
+else:
+confuse[(c["label"], label)] += 1
+rows.append({
+"threshold": th,
+"coverage": covered / len(cases),
+"accuracy": correct / max(covered, 1),
+"top_confusion": confuse.most_common(2),
+})
+return rows
+
+if **name** == "**main**":
+cases = [json.loads(l) for l in open("evals/cases.jsonl", encoding="utf-8")]
+for r in sweep(cases):
+print(f"th={r['threshold']:.2f} coverage={r['coverage']:.2f} "
+f"acc={r['accuracy']:.3f} confusion={r['top_confusion']}")
+
+**如何定阈值**：先设业务约束（例如"自动路由的错误率不超过 2%"），再在满足约束的阈值里选覆盖率最高的那个。不要用准确率单指标——高阈值下准确率必然好看，但覆盖率可能只剩 20%。
+
+**验证方式与常见坑**
+
+- 验证：留出 20% 数据做测试集；对"模型不确定但被硬路由"的样本做人工复核，统计其错误率是否显著高于高置信样本。
+- 坑一：概率未校准。不同输入分布下 0.8 可能含义不同；上线后要持续用真实样本画可靠性曲线。
+- 坑二：类别不平衡。小类常年低置信，阈值一设就全进人工；要分层设阈值。
+- 坑三：输入注入。用户文本里的"忽略上述指令"可能影响分类，判定输入要截断并剥离指令性内容。
+- 坑四：分类器不可用。必须有兜底路径（直接走 LLM 或转人工），并把"分类器错误率"作为告警指标。
+- 坑五：只优化成本不看体验。自动路由错误会以"用户被转错部门"的形式放大，务必把误路由率写进 SLO。
+
+---
+
+## 9. 面试技术问答准备
+
+1. **Skills over MCP 和普通 tool 有什么区别？** tool 是"能执行的动作"（有参数、有副作用），skill 是"怎么做的知识与步骤"（可读、可校验、可版本化）；前者偏执行，后者偏指导，二者常组合使用。
+1. **为什么首字节超时比总超时更重要？** 用户感知的是"多久看到第一个字"；总超时只能兜住最坏情况，无法在 2 秒内做故障转移。首字节超时把"慢"变成"可切换"。
+1. **流式输出到一半失败，能不能换 provider 重试？** 不能直接换——已输出的内容会重复；正确做法是把 `request_id` 与已生成内容记录下来，让客户端决定是否重开，或由服务端返回可续传的偏移。
+1. **分类器路由怎么评估？** 覆盖率、准确率、误路由率三条曲线 + 混淆矩阵；按业务约束（错误率上限）选阈值；上线后监控置信度分布漂移。
+1. **多 agent 的成本为什么总算不准？** 子 agent 的 token 常被漏计；要在 run 结束事件里累加子调用用量（AG-UI 2.0.2 的做法），并与网关账单对账。
+1. **长会话恢复慢，能从哪调？** 快照频率（LangGraph `snapshot_frequency`）、状态存储选型、只回放必要 checkpoint；代价是存储与写入放大。
+
+---
+
+## 10. 持续观察
+
+{% table %}
+- 方向
+- 观察信号
+---
+- Skills over MCP
+- `skills.attach` 是否转正；是否出现跨客户端统一的技能元数据字段
+---
+- 判定端点
+- Jev / Decisions 之外是否有新玩家；定价与限流是否稳定
+---
+- 框架路由抽象
+- ADK `ClassifierNode` 与 AG2 `OpenAIDecisionsConfig` 是否收敛为同一套抽象
+---
+- 流式可靠性
+- `first_event_timeout` 类设置是否成为各家 SDK 标配
+---
+- 任务生命周期
+- A2A parked 超时默认值、是否出现标准化的任务回收语义
+---
+- 可观测
+- 网关归因字段是否形成 OTel 语义约定
+---
+- 岗位 JD
+- 关键词：MCP、Skills、SSE 流式、分类路由、成本归因、多租户
+{% /table %}
+
+---
+
+## 11. 来源与说明
+
+- 主要来源：GitHub Release 与官方仓库（modelcontextprotocol/typescript-sdk v2.4.0、google/adk-python v2.13.0、ag2ai/ag2 v1.2.2、pydantic/pydantic-ai 2.62/2.63/2.64、a2aproject/a2a-python v1.3.0、langchain-ai/langgraph 1.2.18/1.2.19、ag-ui-protocol/ag-ui release/2026-10-30、langfuse/langfuse v4.72.0）。
+- 标注"厂商口径"的性能数字（如 ADK 的 8 倍、Jev 的"比 LLM 快得多"）未经第三方复现。
+- 本报告不涉及训练、微调与硬件选型；上期（2026-10-23）已覆盖 Decisions API GA，本期只跟进其生态落地。
+- 10-30 17:00 的定时触发未产出文件，本期为 10-31 补发；覆盖窗口仍按 10-23 ~ 10-30 计算。

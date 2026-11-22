@@ -1,0 +1,452 @@
+---
+title: 2026-11-20-AI应用工程周报
+description: >-
+  生成时间：20261120（Asia/Shanghai） 读者定位：计算机专业本科生，目标岗位为 AI 大模型应用工程师 / 后端开发
+  范围：只覆盖应用与后端工程视角；不含训练、微调、GPU 与推理引擎内核 口径：✅ 一手（GitHub Release / 官方文档 / 官方
+  changelog）；🟡 二手或厂商口径
+author: Kira
+publishDate: 2026-11-20
+zone: 编程
+tags:
+  - AI周报
+draft: false
+pinned: false
+---
+# AI 应用工程前沿周报（2026-11-13 ~ 2026-11-20）
+
+生成时间：2026-11-20（Asia/Shanghai）
+读者定位：计算机专业本科生，目标岗位为 AI 大模型应用工程师 / 后端开发
+范围：只覆盖应用与后端工程视角；不含训练、微调、GPU 与推理引擎内核
+口径：✅ 一手（GitHub Release / 官方文档 / 官方 changelog）；🟡 二手或厂商口径；🔵 我的判断
+
+---
+
+## 1. 本周摘要
+
+1. **"流式重试"被证实会重复计费，而且不止一家会踩。** LiteLLM 1.110.2（11-20）一次修了三个流式相关缺陷：输出已到达客户端后仍重试导致重复事件与额外计费、reasoning 输出后失败又在 fallback 组重启并发出第二份响应、GPT-6.2 系统提示未命中 prompt cache（除非 `store: false`）。
+   → 求职含义：SSE 的"重试"是幂等问题，不是网络问题。能讲清"首字节后不可重试、事件 id 去重、续传偏移"的人，在同批候选人里非常显眼。
+1. **人工审批开始要求"审的是真实参数"。** pydantic-ai 2.71.0（11-19）新增 `DeferredToolRequests.validated_args`，让审批者看到被延迟的工具调用**将要执行的实际参数**，而不是原始意图。
+   → 求职含义：审批 UI 上显示"删除文件"和显示"删除 /data/prod/2026.csv"是两回事；这是权限设计里最容易被忽略的一层。
+1. **网关开始自带"按 key 的花费上限"。** Langfuse 4.83.0（11-19）给 AI Gateway 加了 per-key spend limits，同时开始服务 MCP 2026-07-28 修订版。
+   → 求职含义：配额从"全局预算"细化到"每把 key"，是内部结算与防滥用的前提；这类配置能力可以直接写进作品集。
+1. **前端 agent 状态机的坑集中在"重叠流"。** AG-UI 1.0.5（11-17）修了 `compactEvents` 在重叠流下打乱消息顺序、导致并行工具调用被交换、以及 mid-stream 快照覆盖增量的问题。
+   → 求职含义：并发流式渲染是前端/全栈岗的真实难点，"顺序与快照边界"这种词能说出来，说明你真做过。
+1. **协议客户端开始补"不优雅但致命"的解析细节。** A2A 1.3.1（11-17）修了 SSE 媒体类型大小写、按 CR/LF/CRLF 切行、REST 路径 id 百分号编码、租户默认值串到别的调用。
+   → 求职含义：协议实现的质量差异，常常就藏在这类"不写进文档"的解析细节里。
+
+---
+
+## 2. 重点进展
+
+### 1. pydantic-ai 2.71.0：审批看到真实参数、网关 provider 扩容、工具输出落盘（框架 / 2026-11-19）
+
+- **具体变化**：
+
+  - `DeferredToolRequests.validated_args`：审批者能看到延迟工具调用**校验后的实际参数**。
+  - 新增网关 provider：`StavProvider`（Stav 欧洲推理网关）、Otari（OpenAI 兼容网关）；`StackOne` 增加 `auth` 并弃用 `api_key`。
+  - `ToolOutputLimits` 溢出支持 `grep_tool_result` 与 `unit='bytes'` 读取——大工具输出不再只能整段塞回模型。
+  - `CodeMode` 的远程回合改为 Temporal activity 执行，长片段不会触发死锁检测。
+  - 延迟暂停的续跑语义收紧：暂停期间排队的内容保持暂停；`BackgroundTools` 在 `DeferredToolRequests` 暂停处等待任务；被批准/外部工具在 `CodeMode(tools='all')` 下保持原生。
+
+- **工程细节**：`PeerNetwork` 重命名为 `PeerConnection`，`Peers(network)` 可按 agent 名加入 `InMemoryPeerNetwork`；`MCPToolsetClient` 的进程内 arm 改为 protocol 类型，兼容 FastMCP 3/4 的严格类型检查。
+
+- **解决什么工程问题**：① 审批信息不对称（批的是意图，执行的是参数）；② 工具输出过大撑爆上下文（落盘 + 检索比截断更可用）；③ 长代码片段在持久化工作流里被误判死锁。
+
+- **最小示例**（Python，示意）：
+
+  from pydantic_ai import Agent
+  from pydantic_ai.capabilities import ToolOutputLimits
+
+  agent = Agent("openai:gpt-6-luna", capabilities=[ToolOutputLimits(max_bytes=200_000)])
+
+  # 超限输出落盘，可用 grep_tool_result 按需检索，而不是整段回灌
+
+- **实践方向**：把审批卡片从"工具名 + 自然语言意图"改成"工具名 + 校验后参数（含 diff）"，并记录审批人看到的那一版参数哈希。
+
+- **来源**：GitHub pydantic/pydantic-ai release v2.71.0
+
+### 2. LiteLLM 1.110.2：流式重试导致的重复事件与重复计费（网关 / 2026-11-20）
+
+- **具体变化**：
+  - Responses API：修复"输出已到达客户端后仍重试"，此前会发送重复事件并产生额外计费（`#52461`）。
+  - Responses API：修复"reasoning 输出后失败"时在 fallback 组重启并发出第二份响应（`#52616`）。
+  - 缓存：修复 GPT-6.2 在 `/v1/chat/completions` 与 `/v1/messages` 上系统提示未命中 prompt cache（除非 `store: false`）（`#52906`，同步回移到 1.106.12 / 1.108.13）。
+  - Anthropic：修复已移除采样参数的 Claude 模型在 `temperature=1` 时返回 400（自 1.110.0-rc.2 起）。
+- **工程细节**：发布说明自述"11 个 PR、修复 8 个、升级无需额外动作"；镜像签名改用 cosign 的 certificate-identity 方式校验。
+- **解决什么工程问题**：流式重试语义——一旦字节写给客户端，就不能"再试一次"，否则用户看到重复内容、账单多一笔；而 reasoning 模型的中间输出让"是否已开始输出"更难判断。
+- **实践方向**：给网关的流式路径加"已发送字节数"状态，>0 时禁止自动重试，只允许返回可续传错误。
+- **来源**：GitHub BerriAI/litellm release v1.110.2
+
+### 3. Langfuse 4.83.0：AI Gateway 按 key 花费上限 + 服务 MCP 2026-07-28（可观测 / 2026-11-19）
+
+- **具体变化**：AI Gateway 新增 **per-key spend limits**；MCP 服务端开始支持 2026-07-28 协议修订版（`#20384`）；Topics 改为 Scatter 视图；native 侧组装自有 OTel resources 与 events；annotation queue 支持条目间跳转。
+- **工程细节**：spend limit 作用在 key 维度，意味着可以给"某个内部工具/某个团队"单独设上限，而不影响全局预算。
+- **解决什么工程问题**：成本治理的两个层次——全局预算防超支，key 级上限防单点滥用（比如某个循环调用 bug 烧穿整月额度）。
+- **实践方向**：给每个调用方发独立 key + 独立上限，跑一次"故意循环调用"实验，验证限流与告警都触发。
+- **来源**：GitHub langfuse/langfuse release v4.83.0
+
+### 4. AG-UI 1.0.5：重叠流下的顺序与快照边界（前端集成 / 2026-11-17）
+
+- **具体变化**：
+  - `compactEvents` 保留消息顺序与快照边界，修复"并行工具调用被交换""增量被 mid-stream 快照覆盖"。
+  - 重叠流之间到达的事件保持到达顺序，避免 `STEP_STARTED`/`STEP_FINISHED` 序列被 `verifyEvents` 判为非法。
+  - `REASONING_MESSAGE_CONTENT` 与文本一样参与压缩，显著减小历史体积。
+  - 大线程重放用 `MessageLookup` 索引替代全表扫描，按 message id / tool call id 定位。
+  - `AbstractAgent.clone()` 复制 `resolvingPeerCeiling`，克隆不再丢字段。
+- **工程细节**：`@ag-ui/client/core/encoder/proto` 同步到 1.0.5；破坏性变更：事件校验现在拒绝缺失/非字符串/继承来的 union discriminator。
+- **解决什么工程问题**：多 agent 并行时前端要同时处理多条流，顺序错了 UI 就会"串台"；重放性能决定长会话能否可用。
+- **实践方向**：构造两个并行工具调用 + 中途快照，断言渲染顺序与后端一致；再把 500 条历史的重放耗时压到可接受范围。
+- **来源**：GitHub ag-ui-protocol/ag-ui release/2026-11-17
+
+### 5. A2A Python 1.3.1：SSE 解析、租户默认值、httpx2（协议 / 2026-11-17）
+
+- **具体变化**：
+  - `httpx2` 支持（`#1439`）；集群模式给 DatabaseTaskEventStream 引入 `ServerCallContext`（`#1399`）。
+  - client 修复：SSE 媒体类型大小写不敏感（`#1464`）、只按 CR/LF/CRLF 切行（`#1456`）、REST 传输路径里的 id 做百分号编码（`#1436`）、租户默认值限定在单次调用内（`#1463`）。
+  - compat：仅凭 task id 取 v0.3 push 配置（`#1380`）。
+- **工程细节**：这四条 client 修复都指向同一类问题——"在多数服务器上能跑，在边界实现上崩"；租户默认值串用更是多租户事故的经典形态。
+- **解决什么工程问题**：跨实现的互操作性；SSE 分帧错误会让流式响应被截断或粘包，长连接场景尤甚。
+- **实践方向**：用一个故意返回 `Text/Event-Stream`（大小写混杂）与纯 CR 换行的假服务器做兼容性测试。
+- **来源**：GitHub a2aproject/a2a-python release v1.3.1
+
+### 6. AG2 1.3.3：google-genai 3.x 的 API 版本默认值变更（框架 / 2026-11-19）
+
+- **具体变化**：`ag2[gemini]` 从 `google-genai<3.0` 放宽到 `>=1.68.0,<4`；3.x 下 Gemini Developer API 默认从 `v1beta` 变为 `v1`。
+- **工程细节**：
+  - `-latest` 别名与部分 `-preview` 模型只存在于 `v1beta`；需要显式 `api_version="v1beta"` 回退，例如 `GeminiConfig(model="gemini-flash-latest", api_version="v1beta")`。
+  - `VertexAIConfig.api_version` 接受 `"v1"`/`"v1beta1"`，Vertex 仍默认 `v1beta1`。
+  - 3.x 默认用 `httpx2`；`http_client` 现在同时接受 `httpx2.AsyncClient` 与 `httpx.AsyncClient`。
+  - 2.x 仍可用但会发 `DeprecationWarning`；AG2 1.4.0 将要求 `google-genai>=3,<4`。
+- **解决什么工程问题**：SDK 大版本把默认 API 版本从 beta 切到 GA，会让"只在 beta 有的模型"静默 404；这类升级必须在 CI 里用真实模型名跑一遍。
+- **实践方向**：把"模型别名 → 实际 API 版本"做成启动自检，失败就 fail fast。
+- **来源**：GitHub ag2ai/ag2 release v1.3.3
+
+### 7. Agno 3.2.1：把"会话压缩"做成可查询的账本（框架 / 2026-11-17）
+
+- **具体变化**：
+  - 新增 `GET /sessions/{session_id}/compactions`：在 `SqliteDb` 与 `PostgresDb` 上按时间倒序列出该会话的压缩记录，包含每次替换了多少条消息、压缩前后 token 数。
+  - Company Files：`GET /company/tasks/{task_id}/files` 与 `GET /company/notes`（含 `/{path}` 单文件读取）。
+  - 工具统一超时：`LinearTools`/`DiscordTools`/`ModelsLabTools` 接受 `timeout`（默认 30s，ModelsLab 120s）；`MCPTools.connect()` 返回布尔；`Qdrant` 的 `async_insert` 支持 `batch_size`。
+  - `Skills` 修复中文等非 ASCII 指令、引用与脚本输出乱码。
+- **工程细节**：压缩记录带前后 token 数，等于给"压缩到底省了多少"提供了可校验的账；配合请求日志即可做压缩策略 A/B。
+- **解决什么工程问题**：上下文压缩长期是黑盒——省了 token 但不知道省在哪、有没有丢关键信息；把压缩事件结构化后，才谈得上门禁与回归。
+- **实践方向**：给压缩接口接一个看板，按策略统计"平均压缩比 / 压缩频次 / 压缩后首轮错误率"。
+- **来源**：GitHub agno-agi/agno release v3.2.1
+
+### 8. LangGraph 1.2.22：宽状态图的性能修补（运行时 / 2026-11-14）
+
+- **具体变化**：`add_messages` 对纯消息跳过转换；读取任务状态前先按任务过滤 pending writes；宽状态（字段很多）下用集合匹配 update key；runner 停止条件只检查失败的 future；每 run 只查找一次 untracked 与 delta channel；修复"调用方订阅子图时，子图在自己的 thread 上流式输出"。
+- **工程细节**：同期发布 `checkpoint-postgres 3.2.1`、`prebuilt 1.1.2`、`checkpoint 4.3.2`；这些优化对"状态字段多、消息多"的长会话最明显。
+- **解决什么工程问题**：宽状态 + 长历史下，每次 step 的固定开销会累积成明显的 P95 抬升；这类"框架内部 O(n) 操作"往往被误判为模型慢。
+- **实践方向**：造一个 50 字段状态 + 1 万条消息的图，压测升级前后的 step 耗时。
+- **来源**：GitHub langchain-ai/langgraph release 1.2.22
+
+> 其他发版：LangGraph 1.2.23/1.2.24（11-19/11-20）修 `REMOVE_ALL_MESSAGES` 归约与 `DeltaChannel` 的 None checkpoint；langchain-openrouter 0.3.0 要求 Python 3.11 并刷新 model profiles；CrewAI 1.15.44 增加版本化 artifact 与 `FilePath` 的 cwd 约束；Vercel `ai@7.0.177` 为常规补丁。
+
+---
+
+## 3. 求职价值分级
+
+**优先掌握（直接影响面试与作品集）**
+
+- 流式幂等：首字节后禁止重试、事件 id 去重、续传偏移（LiteLLM 1.110.2 的直接教训）。
+- 审批要审"真实参数"：`validated_args` + 参数哈希 + 审批快照（pydantic-ai 2.71）。
+- 配额分层：全局预算 + key 级上限 + 告警（Langfuse 4.83 的 per-key spend limits）。
+- 压缩可观测：记录前后 token、替换消息数、策略 id（Agno 3.2.1 的 compactions API）。
+
+**值得了解**
+
+- 重叠流的前端顺序与快照边界（AG-UI 1.0.5）。
+- 协议客户端的解析细节：媒体类型大小写、CR/LF 分帧、路径编码、租户默认值。
+- SDK 大版本的默认值变更（google-genai 3.x 的 `v1`/`v1beta`）。
+- 宽状态图的框架内部开销（LangGraph 1.2.22）。
+
+**持续观察**
+
+- 网关是否普遍提供 per-key 预算与"已发送字节"级别的重试控制。
+- 压缩账本是否成为框架标准接口（目前 Agno 独有）。
+- AG-UI 1.0.x 是否稳定到可以写进简历主技能。
+- MCP 2026-07-28 在观测/网关侧的采用速度。
+
+**判断依据**：优先掌握项满足"能写代码 + 能讲事故 + JD 高频"；纯前端渲染细节与 beta 抽象只做了解。
+
+---
+
+## 4. 本周重点推荐
+
+**推荐一：流式网关的幂等与续传（岗位：后端 / 平台）**
+
+- 面试考点：为什么首字节后不能重试、如何用事件 id 去重、断线续传的偏移怎么定、如何避免双重计费。
+- 简历成果：SSE 中继 + 事件 id + 续传 + 故障注入测试（上游在第 3 个事件后断开），附"重复事件数 = 0"的证据。
+
+**推荐二：审批快照（岗位：后端 / 安全）**
+
+- 面试考点：审批对象是意图还是参数、参数哈希的作用、审批后参数被改动怎么办、如何做审计。
+- 简历成果：审批表（含参数快照与哈希）+ 篡改检测 + 并发审批测试。
+
+**推荐三：压缩账本与看板（岗位：AI 应用 / 平台）**
+
+- 面试考点：压缩比怎么算、如何判断压缩是否伤效果、压缩与缓存的关系、账本如何驱动策略迭代。
+- 简历成果：压缩记录表 + 查询接口 + 按策略的成功率/token 对比图。
+
+---
+
+## 5. 两小时行动清单（可当天跑通）
+
+**0:00–0:15 环境**
+
+mkdir sse-idem && cd sse-idem
+python -m venv .venv && .venv\Scripts\activate
+pip install fastapi uvicorn httpx pytest
+
+**0:15–0:45 写 SSE 中继（第 7 节有完整代码）**
+
+- 上游每 0.2s 发一个事件并带 `id`；中继记录"已发送事件 id 集合"。
+- 用假上游在第 3 个事件后主动断开，验证中继**不重试**而是发 `event: error`。
+- 预期产出：客户端收到的 id 序列为 1,2,3 且无重复。
+
+**0:45–1:15 续传**
+
+- 客户端带 `Last-Event-ID: 3` 重连，中继从 4 开始发；断言不重发 1~3。
+- 预期产出：两条测试用例（禁止重试 / 正确续传）全绿。
+
+**1:15–1:45 压缩账本**
+
+- 建表 `compactions(session_id, strategy, msgs_before, msgs_after, tokens_before, tokens_after, created_at)`，写一个 `GET /sessions/{id}/compactions`。
+- 造 5 条假压缩记录，算"平均压缩比"与"平均每条消息 token"。
+- 预期产出：一段 JSON 输出 + 一句话结论写进 README。
+
+**1:45–2:00 收尾**
+
+- README：故障注入说明、事件 id 语义、账本字段含义、已知限制（未接真实上游）。
+
+---
+
+## 6. 简历与面试转化
+
+**项目 A：可续传的 SSE 中继（技术栈：FastAPI + httpx + pytest，6\~8 小时）**
+
+- 成果：事件 id + 去重集合 + 续传 + 首字节后禁止重试 + 故障注入用例；可选接入一个真实 provider 做对照。
+- 可能追问：事件 id 由谁生成？多副本下已发送集合放哪（Redis）？客户端乱序重连怎么办？如何避免"续传导致重复计费"？
+
+**项目 B：审批快照服务（技术栈：FastAPI + SQLite/Postgres，6\~8 小时）**
+
+- 成果：参数快照 + 哈希 + 篡改检测 + 审计日志 + 并发测试；与 pydantic-ai `validated_args` 对接说明。
+- 可能追问：参数里有敏感信息怎么存？审批后模型重试导致参数变了怎么办？如何证明"执行的就是批准的那份"？
+
+**项目 C：压缩账本（技术栈：Python + SQLite + 简单看板，6\~8 小时）**
+
+- 成果：记录表 + 查询 API + 压缩比统计 + 与成功率的相关性分析（用合成任务）。
+- 可能追问：token 数用哪家的计数？压缩后如何验证没丢关键信息？为什么压缩会影响缓存命中？
+
+以上为建议方案，请按实际完成情况如实描述。
+
+---
+
+## 7. 技术深潜一：SSE 中继的幂等与续传
+
+**问题定义**
+网关/中继在上游断流时自动重试，看起来是"提高可用性"，实际制造两类事故：① 客户端收到重复内容（同一段回答出现两遍）；② 上游已经生成并计费，重试又付一次。反过来，完全不重试也不行：客户端断网重连时应该能接着看，而不是从头再来。
+
+**方案与架构**
+
+客户端 --(Last-Event-ID: 3)--> 中继 --(after=3)--> 上游
+|
++-- 已发送事件 id 集合（单机内存 / 多副本 Redis）
++-- 已发送字节数（>0 则禁止重试）
+规则：
+
+1) 事件 id 单调递增，由上游生成或中继生成
+1) id <= Last-Event-ID 的事件丢弃（续传）
+1) 同一 id 只发一次（去重）
+1) 首字节后上游失败 -> 发 error 事件并结束，不重试
+1) 首字节前失败 -> 允许切换/重试（此时没有重复风险）
+
+**关键实现**（可直接复制）
+
+\# sse_relay.py
+import json
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+import httpx
+
+app = FastAPI()
+UPSTREAM = "http://127.0.0.1:9100/events"
+
+@app.get("/events")
+async def events(request: Request):
+last_id = int(request.headers.get("last-event-id", "0") or 0)
+
+async def gen():
+sent: set[int] = set()
+emitted = 0
+try:
+async with httpx.AsyncClient(timeout=None) as c:
+async with c.stream("GET", UPSTREAM, params={"after": last_id}) as r:
+r.raise_for_status()
+async for line in r.aiter_lines():
+if not line.startswith("data:"):
+continue
+payload = json.loads(line[5:].strip())
+eid = int(payload["id"])
+if eid <= last_id or eid in sent:
+continue                      # 续传 + 去重
+sent.add(eid)
+emitted += 1
+yield "id: " + str(eid) + "\n" \
+
++ "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
+  except httpx.HTTPError:
+  reason = "upstream_broken_after_first_byte" if emitted else "upstream_unavailable"
+  yield "event: error\ndata: " + json.dumps({"reason": reason}) + "\n\n"
+  return                                            # 关键：不重试
+
+return StreamingResponse(gen(), media_type="text/event-stream",
+headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+配套的假上游（用于验证）：
+
+\# fake_upstream.py
+import asyncio, json
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+
+app = FastAPI()
+
+@app.get("/events")
+async def events(after: int = 0, break_at: int = 3):
+async def gen():
+for i in range(1, 6):
+if i == break_at + 1:
+raise RuntimeError("upstream broke")   # 第 4 个事件前断开
+if i <= after:
+continue
+yield "data: " + json.dumps({"id": i, "delta": "chunk-" + str(i)}) + "\n\n"
+await asyncio.sleep(0.2)
+return StreamingResponse(gen(), media_type="text/event-stream")
+
+**验证方式与常见坑**
+
+- 验证：① 正常拉取 5 个事件；② 上游断在第 4 个前，客户端应收到 1~3 + 一个 error 事件（且无重复）；③ 带 `Last-Event-ID: 3` 重连，应只收到 4、5。
+- 坑一：事件 id 由中继自己生成会导致"重连后对不上"，务必让 id 与上游序列一致，或建立映射。
+- 坑二：多副本时 `sent` 集合在进程内存里，重连落到另一副本就会重复发；上 Redis（key 带 stream id + TTL）。
+- 坑三：把 `event: error` 当成 HTTP 错误返回，会导致客户端不解析、直接重连风暴。
+- 坑四：反代缓冲让"首字节"迟到，重试判断失真；关闭 proxy_buffering 并设 X-Accel-Buffering。
+- 坑五：续传与计费脱钩。重连续传不应让上游重新生成；用 `after` 参数或 session 复用，而不是重新发 prompt。
+
+---
+
+## 8. 技术深潜二：把"压缩"记成一笔可核对的账
+
+**问题定义**
+上下文压缩上线后，团队通常只知道"token 少了"，不知道：省在哪、压缩了几次、压缩后任务是否变差、哪个策略更划算。没有账本，压缩策略就只能拍脑袋调参。
+
+**方案与架构**
+
+压缩发生 -> 记录一条事实：
+session_id, strategy, strategy_version,
+msgs_before/after, tokens_before/after,
+first_token_ms_before/after, success_before/after（可选，来自 eval）
+查询 -> 按会话/策略/时间聚合：压缩比、频次、平均替换消息数
+决策 -> 压缩比高但成功率掉 -> 收紧阈值或换策略
+
+**关键实现**（可直接复制）
+
+\# compaction_ledger.py
+import sqlite3, time, uuid
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS compactions(
+id TEXT PRIMARY KEY,
+session_id TEXT NOT NULL,
+strategy TEXT NOT NULL,
+strategy_version TEXT NOT NULL,
+msgs_before INTEGER, msgs_after INTEGER,
+tokens_before INTEGER, tokens_after INTEGER,
+created_at REAL NOT NULL
+)"""
+
+def connect(path="compactions.db"):
+c = sqlite3.connect(path, isolation_level=None)
+c.execute(SCHEMA)
+return c
+
+def record(conn, session_id, strategy, version, before, after):
+conn.execute("INSERT INTO compactions VALUES (?,?,?,?,?,?,?,?,?)",
+(str(uuid.uuid4()), session_id, strategy, version,
+before["msgs"], after["msgs"], before["tokens"], after["tokens"], time.time()))
+
+def report(conn, session_id=None):
+sql = """SELECT strategy, strategy_version, COUNT(*) AS n,
+AVG(1.0 * tokens_after / tokens_before) AS ratio,
+AVG(msgs_before) AS mb, AVG(msgs_after) AS ma
+FROM compactions {where} GROUP BY strategy, strategy_version"""
+where, args = ("WHERE session_id = ?", (session_id,)) if session_id else ("", ())
+rows = conn.execute(sql.format(where=where), args).fetchall()
+return [{"strategy": r[0], "version": r[1], "n": r[2],
+"avg_token_ratio": round(r[3], 3),
+"avg_msgs_before": round(r[4], 1), "avg_msgs_after": round(r[5], 1)} for r in rows]
+
+if **name** == "**main**":
+db = connect()
+record(db, "s1", "summarize", "v3", {"msgs": 40, "tokens": 12000}, {"msgs": 8, "tokens": 3000})
+record(db, "s1", "trim", "v1", {"msgs": 40, "tokens": 12000}, {"msgs": 10, "tokens": 4200})
+print(report(db, "s1"))
+
+**验证方式与常见坑**
+
+- 验证：同一批会话分别用两种策略跑，比较压缩比与"压缩后首轮成功率"；若成功率掉超过阈值，则该策略不能默认开启。
+- 坑一：token 计数来源不一致（厂商返回 vs 本地估算），压缩比会失真；统一用同一来源并记录版本。
+- 坑二：压缩改变前缀会打掉 prompt cache，"省 token 但更贵"；账本里要同时记 cache 命中。
+- 坑三：把工具调用与其结果切开，压缩后工具结果找不到对应调用，模型会困惑；按"完整工具轮次"为单位压缩。
+- 坑四：只记成功案例。失败/异常压缩也要记，否则比例有偏。
+- 坑五：策略无版本号。改了摘要提示后无法区分"变好"是策略还是模型变化。
+
+---
+
+## 9. 面试技术问答准备
+
+1. **为什么流式响应首字节之后不能重试？** 字节已经写给客户端，重试会产生重复内容；上游也可能已计费。正确做法是发可识别的错误事件并让客户端按 Last-Event-ID 续传。
+1. **事件 id 应该由谁生成？** 与上游序列一致最稳（便于续传映射）；若上游没有 id，中继生成并持久化映射，重连时按映射继续，不能重新计数。
+1. **审批为什么要看"校验后的参数"？** 意图可以被模型改写，参数才是实际执行的东西；审批对象应是参数快照 + 哈希，执行前再校验一次。
+1. **per-key 预算和全局预算有什么区别？** 全局防超支，key 级防单点滥用；两者要同时存在，且告警阈值不同。
+1. **压缩账本要记哪些字段才有用？** 策略与版本、前后消息数/token、缓存命中、压缩后首轮成败；缺任一项都无法归因。
+1. **SDK 大版本为什么会静默失败？** 默认值变更（如 API 版本从 beta 到 GA）会让只在旧版本存在的模型/别名 404；升级要在 CI 用真实模型名做冒烟。
+
+---
+
+## 10. 持续观察
+
+{% table %}
+- 方向
+- 观察信号
+---
+- 流式幂等
+- 网关是否提供"已发送字节"级别的重试控制与标准续传语义
+---
+- 审批
+- `validated_args` 类能力是否成为各框架标配
+---
+- 配额
+- per-key 预算是否下沉到网关/SDK 层
+---
+- 压缩
+- 压缩账本是否成为框架标准接口；是否出现统一压缩策略描述
+---
+- 协议
+- AG-UI 1.0.x 稳定性；A2A 1.3.x 的边界修复节奏
+---
+- SDK 升级
+- google-genai 3.x 采用率；其他 SDK 是否也有默认版本切换
+---
+- 岗位 JD
+- 关键词：SSE 续传、幂等、审批快照、per-key 配额、压缩比
+{% /table %}
+
+---
+
+## 11. 来源与说明
+
+- 主要来源：GitHub Release（pydantic/pydantic-ai v2.71.0、BerriAI/litellm v1.110.2、langfuse/langfuse v4.83.0、ag-ui-protocol/ag-ui release/2026-11-17、a2aproject/a2a-python v1.3.1、ag2ai/ag2 v1.3.3、agno-agi/agno v3.2.1、langchain-ai/langgraph 1.2.22/1.2.23/1.2.24、langchain-ai/langchain langchain-openrouter 0.3.0、crewAIInc/crewAI 1.15.44）。
+- 版本号与修复条目均可在对应 release 页核对；厂商对性能/价格的表述未在本期引用具体倍数。
+- 本报告不涉及训练、微调与硬件选型；本周未发现需要单独展开的 RAG/向量库重大更新（Qdrant 仅有小改动，已在条目 7 提及）。
